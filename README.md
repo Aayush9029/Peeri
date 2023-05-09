@@ -3,9 +3,9 @@
 
 
 
-
 <p align="center">
-  <img src="https://user-images.githubusercontent.com/43297314/235262482-0a738e25-5051-40e7-b274-39e505f63a34a.png" height="128">
+
+  <img src="https://github.com/Aayush9029/Peeri/assets/43297314/9217a341-c60b-47bf-a4a0-496bd842f4d8)" height="128">
   <h1 align="center">Peeri for macOS</h1>
 </p>
 
