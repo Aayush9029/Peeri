@@ -13,5 +13,6 @@ struct PeeriApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
     }
 }

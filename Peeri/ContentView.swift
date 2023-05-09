@@ -10,12 +10,42 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundColor(.accentColor)
-            Text("Hello, world!")
+            HStack {
+                VStack {
+                    HStack {
+                        Image("PeeriAppIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16)
+                        Text("Peeri")
+                            .bold()
+                        Spacer()
+                    }
+                    .padding(.bottom)
+                    SideBar()
+                    Spacer()
+                }
+                .frame(width: 256)
+                .padding(.horizontal, 8)
+                .padding(.vertical)
+
+                .background(.gray.opacity(0.012))
+                .cornerRadius(16)
+                VStack {
+                    SeedsView()
+                    Divider()
+                        .padding(.vertical)
+                    TransferView()
+                        .frame(height: 320)
+                        .padding()
+                }
+            }
         }
-        .padding()
+        .padding(8)
+        .padding(.top)
+
+        .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
+        .ignoresSafeArea()
     }
 }
 

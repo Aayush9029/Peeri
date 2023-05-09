@@ -11,6 +11,10 @@
 		456853EE2A0A2E3C0081389F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853ED2A0A2E3C0081389F /* ContentView.swift */; };
 		456853F02A0A2E3D0081389F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 456853EF2A0A2E3D0081389F /* Assets.xcassets */; };
 		456853F32A0A2E3D0081389F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 456853F22A0A2E3D0081389F /* Preview Assets.xcassets */; };
+		456853FD2A0A2F1B0081389F /* SideBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853FC2A0A2F1B0081389F /* SideBar.swift */; };
+		456853FF2A0A34470081389F /* SeedsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853FE2A0A34470081389F /* SeedsView.swift */; };
+		456854022A0A3C590081389F /* TransferView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456854012A0A3C590081389F /* TransferView.swift */; };
+		456854042A0A47D10081389F /* VisualEffect+View.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456854032A0A47D10081389F /* VisualEffect+View.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -20,6 +24,10 @@
 		456853EF2A0A2E3D0081389F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		456853F22A0A2E3D0081389F /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		456853F42A0A2E3D0081389F /* Peeri.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Peeri.entitlements; sourceTree = "<group>"; };
+		456853FC2A0A2F1B0081389F /* SideBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SideBar.swift; sourceTree = "<group>"; };
+		456853FE2A0A34470081389F /* SeedsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedsView.swift; sourceTree = "<group>"; };
+		456854012A0A3C590081389F /* TransferView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferView.swift; sourceTree = "<group>"; };
+		456854032A0A47D10081389F /* VisualEffect+View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VisualEffect+View.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,6 +62,8 @@
 			children = (
 				456853EB2A0A2E3C0081389F /* PeeriApp.swift */,
 				456853ED2A0A2E3C0081389F /* ContentView.swift */,
+				456854032A0A47D10081389F /* VisualEffect+View.swift */,
+				456853FA2A0A2EE70081389F /* Views */,
 				456853EF2A0A2E3D0081389F /* Assets.xcassets */,
 				456853F42A0A2E3D0081389F /* Peeri.entitlements */,
 				456853F12A0A2E3D0081389F /* Preview Content */,
@@ -67,6 +77,32 @@
 				456853F22A0A2E3D0081389F /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		456853FA2A0A2EE70081389F /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				456853FB2A0A2EEB0081389F /* Sidebar */,
+				456854002A0A3C480081389F /* Seeds */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		456853FB2A0A2EEB0081389F /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+				456853FC2A0A2F1B0081389F /* SideBar.swift */,
+			);
+			path = Sidebar;
+			sourceTree = "<group>";
+		};
+		456854002A0A3C480081389F /* Seeds */ = {
+			isa = PBXGroup;
+			children = (
+				456853FE2A0A34470081389F /* SeedsView.swift */,
+				456854012A0A3C590081389F /* TransferView.swift */,
+			);
+			path = Seeds;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -140,6 +176,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				456853EE2A0A2E3C0081389F /* ContentView.swift in Sources */,
+				456854042A0A47D10081389F /* VisualEffect+View.swift in Sources */,
+				456854022A0A3C590081389F /* TransferView.swift in Sources */,
+				456853FF2A0A34470081389F /* SeedsView.swift in Sources */,
+				456853FD2A0A2F1B0081389F /* SideBar.swift in Sources */,
 				456853EC2A0A2E3C0081389F /* PeeriApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
