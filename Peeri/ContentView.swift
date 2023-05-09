@@ -13,10 +13,6 @@ struct ContentView: View {
             HStack {
                 VStack {
                     HStack {
-                        Image("PeeriAppIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 16)
                         Text("Peeri")
                             .bold()
                         Spacer()
