@@ -1,5 +1,6 @@
+> **Warning**
+> **Peeri** is currently in concept phase and not yet ready for development. Check back later, contributions are welcome.
 
-> **Warning** : **peeri** is currently in concept phase and not yet ready for development. Check back later, contributions are welcome.
 
 
 
