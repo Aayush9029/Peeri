@@ -1,4 +1,4 @@
-> **Warning**
+> [!NOTE]  
 > **Peeri** is currently in concept phase and not yet ready for development. Check back later, contributions are welcome.
 
 
