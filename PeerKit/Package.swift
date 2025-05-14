@@ -45,7 +45,6 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.7.0"),
         .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.1.0"),
         .package(url: "https://github.com/rurza/KeyboardShortcuts.git", branch: "main"),
-        .package(url: "https://github.com/mixpanel/mixpanel-swift", branch: "master"),
         .package(url: "https://github.com/pointfreeco/swift-sharing.git", from: "2.4.0"),
         .package(url: "https://github.com/Clipy/Sauce.git", from: "2.4.1"),
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.8.1"),
