@@ -5,35 +5,147 @@
 //  Created by Aayush Pokharel on 2023-05-09.
 //
 
+import Models
 import SwiftUI
 
-struct SideBar: View {
-    var body: some View {
-        VStack(alignment: .leading) {
-            Text("Overview")
-                .foregroundStyle(.secondary)
+enum DownloadFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case downloading = "Downloading"
+    case paused = "Paused"
+    case completed = "Completed"
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .all: return "diamond"
+        case .downloading: return "arrow.down"
+        case .paused: return "pause"
+        case .completed: return "checkmark"
+        }
+    }
+    
+    func filter(_ downloads: [DownloadFile]) -> [DownloadFile] {
+        switch self {
+        case .all:
+            return downloads
+        case .downloading:
+            return downloads.filter { $0.status == .downloading }
+        case .paused:
+            return downloads.filter { $0.status == .paused }
+        case .completed:
+            return downloads.filter { $0.status == .completed }
+        }
+    }
+}
 
-            SideBarRow(
-                "Overview",
-                icon: "diamond",
-                count: 0
-            )
-            SideBarRow(
-                "Downloading",
-                icon: "arrow.down",
-                count: 3,
-                selected: true
-            )
-            SideBarRow(
-                "Seeding",
-                icon: "arrow.up",
-                count: 2
-            )
-            SideBarRow(
-                "Completed",
-                icon: "checkmark",
-                count: 150
-            )
+struct SideBar: View {
+    @Binding var selectedFilter: DownloadFilter
+    let activeCount: Int
+    let pausedCount: Int
+    let completedCount: Int
+    let connectionState: ConnectionState
+    
+    init(selectedFilter: Binding<DownloadFilter>, activeCount: Int = 0, pausedCount: Int = 0, completedCount: Int = 0, connectionState: ConnectionState = .disconnected) {
+        self._selectedFilter = selectedFilter
+        self.activeCount = activeCount
+        self.pausedCount = pausedCount
+        self.completedCount = completedCount
+        self.connectionState = connectionState
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Downloads")
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
+
+            ForEach(DownloadFilter.allCases) { filter in
+                SideBarRow(
+                    filter.rawValue,
+                    icon: filter.icon,
+                    count: getCount(for: filter),
+                    selected: selectedFilter == filter
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedFilter = filter
+                }
+            }
+            
+            Spacer()
+            
+            // Connection status indicator
+            ConnectionStatusView(state: connectionState)
+                .padding(.top, 8)
+        }
+    }
+    
+    private func getCount(for filter: DownloadFilter) -> Int {
+        switch filter {
+        case .all:
+            return activeCount + pausedCount + completedCount
+        case .downloading:
+            return activeCount
+        case .paused:
+            return pausedCount
+        case .completed:
+            return completedCount
+        }
+    }
+}
+
+struct ConnectionStatusView: View {
+    let state: ConnectionState
+    
+    var body: some View {
+        HStack {
+            Circle()
+                .frame(width: 8, height: 8)
+                .foregroundColor(stateColor)
+            
+            Text(stateText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            Spacer()
+        }
+        .padding(8)
+        .background(.gray.opacity(0.05))
+        .cornerRadius(8)
+    }
+    
+    private var stateColor: Color {
+        switch state {
+        case .connected:
+            return .green
+        case .connecting:
+            return .orange
+        case .emulation:
+            return .blue
+        case .disconnected:
+            return .red
+        case .failed:
+            return .red
+        @unknown default:
+            return .gray
+        }
+    }
+    
+    private var stateText: String {
+        switch state {
+        case .connected:
+            return "Connected"
+        case .connecting:
+            return "Connecting..."
+        case .disconnected:
+            return "Disconnected"
+        case .emulation:
+            return "Emulation Mode"
+        case .failed(let error):
+            return "Error: \(error.localizedDescription)"
+        @unknown default:
+            return "Unknown State"
         }
     }
 }
@@ -67,7 +179,6 @@ struct SideBarRow: View {
                     .cornerRadius(8)
             }
             .font(.title3)
-
             .padding(6)
         }
         .opacity(selected ? 1 : 0.75)
@@ -79,7 +190,7 @@ struct SideBarRow: View {
 
 struct SideBar_Previews: PreviewProvider {
     static var previews: some View {
-        SideBar()
+        SideBar(selectedFilter: .constant(.all))
             .padding()
             .background(.black)
             .cornerRadius(18)
