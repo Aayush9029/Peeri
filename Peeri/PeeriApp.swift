@@ -9,100 +9,144 @@ struct PeeriApp: App {
     }
     
     private func startAria2Daemon() {
-        print("Starting aria2 daemon...")
+        print("Starting aria2 daemon using bundled executable...")
         
-        // Check if aria2 script exists in the bundle
-        if let scriptPath = Bundle.main.path(forResource: "start_aria2", ofType: "sh") {
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: "/bin/bash")
-            task.arguments = [scriptPath]
+        // Get the path to the bundled aria2c executable
+        // First check in main bundle
+        var aria2cPath = Bundle.main.path(forResource: "aria2c", ofType: nil)
+        
+        // If not found in the main bundle, check if it's in the root directory
+        if aria2cPath == nil {
+            let rootPath = Bundle.main.bundlePath.deletingLastPathComponent
+            let potentialPath = rootPath + "/aria2c"
             
-            // Create a pipe to capture output
-            let outputPipe = Pipe()
-            task.standardOutput = outputPipe
-            task.standardError = outputPipe
-            
-            do {
-                try task.run()
-                
-                // Read output for debugging
-                let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
-                if let output = String(data: outputData, encoding: .utf8) {
-                    print("Aria2 daemon output: \(output)")
-                }
-                
-                // Give aria2 some time to start up
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    print("Aria2 daemon should be running now")
-                }
-            } catch {
-                print("Failed to start aria2 daemon: \(error)")
-                self.installAndStartAria2Manually()
+            if FileManager.default.fileExists(atPath: potentialPath) {
+                aria2cPath = potentialPath
+                print("Found aria2c at root path: \(potentialPath)")
             }
-        } else {
-            print("Could not find start_aria2.sh script in bundle, using inline script")
-            self.installAndStartAria2Manually()
         }
+        
+        // Use the provided executable or extract if needed
+        let executablePath = aria2cPath ?? extractAria2cExecutable()
+        print("Using aria2c executable at: \(executablePath)")
+        
+        // Create and configure the daemon
+        setupAria2ConfigFile(using: executablePath)
     }
     
-    private func installAndStartAria2Manually() {
-        print("Installing and starting aria2 manually...")
+    // Extract aria2c executable if not found in bundle
+    private func extractAria2cExecutable() -> String {
+        print("Extracting embedded aria2c executable...")
+        
+        // Create a temporary directory for the executable
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("peeri_aria2c")
+        let executablePath = tempDir.appendingPathComponent("aria2c").path
+        
+        do {
+            // Create directory if it doesn't exist
+            if !FileManager.default.fileExists(atPath: tempDir.path) {
+                try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            }
+            
+            // Check if executable already exists at temp location
+            if !FileManager.default.fileExists(atPath: executablePath) {
+                // Copy from app bundle or bundle root (custom logic may be needed)
+                // Here you would copy the embedded version
+                
+                // For now, we'll throw an error since we expect it to be in the bundle
+                fatalError("aria2c executable not found in bundle or root directory. The app cannot function without it.")
+            }
+            
+            // Ensure it's executable
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executablePath)
+        } catch {
+            print("Error extracting aria2c: \(error)")
+            // Still return the path - we'll handle the error when trying to execute
+        }
+        
+        return executablePath
+    }
+    
+    private func setupAria2ConfigFile(using aria2cPath: String) {
+        print("Setting up aria2 configuration...")
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         
+        // Create logs directory if it doesn't exist
+        let logsDir = "\(homeDir)/.peeri/logs"
+        do {
+            try FileManager.default.createDirectory(atPath: logsDir, withIntermediateDirectories: true)
+        } catch {
+            print("Failed to create logs directory: \(error)")
+        }
+        
         // Create .aria2 directory if it doesn't exist
-        let aria2Dir = "\(homeDir)/.aria2"
+        let aria2Dir = "\(homeDir)/.peeri/aria2"
         if !FileManager.default.fileExists(atPath: aria2Dir) {
             do {
                 try FileManager.default.createDirectory(atPath: aria2Dir, withIntermediateDirectories: true)
             } catch {
-                print("Failed to create .aria2 directory: \(error)")
-                return
+                print("Critical error - failed to create aria2 directory: \(error)")
+                fatalError("Cannot create required aria2 directory: \(error)")
             }
         }
         
-        // Create config file if it doesn't exist
+        // Path to log file
+        let logPath = "\(logsDir)/aria2c.log"
+        
+        // Create config file
         let configPath = "\(aria2Dir)/aria2.conf"
-        if !FileManager.default.fileExists(atPath: configPath) {
-            let configContent = """
-            # Basic configuration file for Aria2
-            
-            # Downloads directory
-            dir=\(homeDir)/Downloads
-            
-            # Enable JSON-RPC server
-            enable-rpc=true
-            rpc-listen-all=true
-            rpc-listen-port=6800
-            rpc-secret=peeri
-            
-            # BitTorrent settings
-            bt-enable-lpd=true
-            bt-max-peers=50
-            bt-request-peer-speed-limit=100K
-            enable-peer-exchange=true
-            
-            # Connection settings
-            max-concurrent-downloads=5
-            max-connection-per-server=10
-            max-overall-download-limit=0
-            max-overall-upload-limit=50K
-            min-split-size=1M
-            split=10
-            
-            # Other settings
-            check-integrity=true
-            continue=true
-            """
-            
-            do {
-                try configContent.write(toFile: configPath, atomically: true, encoding: .utf8)
-            } catch {
-                print("Failed to create aria2 config file: \(error)")
-                return
-            }
+        let configContent = """
+        # Basic configuration file for Aria2
+        
+        # Downloads directory
+        dir=\(homeDir)/Downloads
+        
+        # Enable JSON-RPC server
+        enable-rpc=true
+        rpc-listen-all=true
+        rpc-listen-port=6800
+        rpc-secret=peeri
+        
+        # BitTorrent settings
+        bt-enable-lpd=true
+        bt-max-peers=50
+        bt-request-peer-speed-limit=100K
+        enable-peer-exchange=true
+        
+        # Connection settings
+        max-concurrent-downloads=5
+        max-connection-per-server=10
+        max-overall-download-limit=0
+        max-overall-upload-limit=50K
+        min-split-size=1M
+        split=10
+        
+        # Logging
+        log=\(logPath)
+        log-level=info
+        
+        # Other settings
+        check-integrity=true
+        continue=true
+        """
+        
+        do {
+            try configContent.write(toFile: configPath, atomically: true, encoding: .utf8)
+            print("Created aria2 config file at \(configPath)")
+        } catch {
+            print("Critical error - failed to create aria2 config file: \(error)")
+            fatalError("Cannot create required aria2 config file: \(error)")
         }
         
-        // Try to kill any existing aria2c processes
+        // Kill any existing aria2c processes
+        killExistingAria2Processes()
+        
+        // Start aria2c with our config
+        startAria2Process(executablePath: aria2cPath, configPath: configPath, logPath: logPath)
+    }
+    
+    private func killExistingAria2Processes() {
+        print("Stopping any existing aria2c processes...")
         do {
             let killTask = Process()
             killTask.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
@@ -113,101 +157,75 @@ struct PeeriApp: App {
             print("Note: Failed to kill existing aria2c processes: \(error)")
             // Continue anyway
         }
-        
-        // Start aria2c
-        startAria2Daemon(configPath: configPath)
     }
     
-    private func startAria2Daemon(configPath: String) {
-        DispatchQueue.global(qos: .background).async {
-            // Try to find aria2c executable
-            let aria2cPath = self.findAria2cExecutable()
-            
-            if let executablePath = aria2cPath {
-                print("Found aria2c at: \(executablePath)")
+    private func startAria2Process(executablePath: String, configPath: String, logPath: String) {
+        print("Starting aria2c process with executable at: \(executablePath)")
+        
+        // Make the aria2c executable file permissions correct
+        do {
+            let fileAttributes = [FileAttributeKey.posixPermissions: 0o755]
+            try FileManager.default.setAttributes(fileAttributes, ofItemAtPath: executablePath)
+        } catch {
+            print("Warning: Could not set executable permissions on aria2c: \(error)")
+            // Continue anyway
+        }
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                // Create process
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: executablePath)
+                task.arguments = ["--conf-path=\(configPath)"]
                 
-                do {
-                    let task = Process()
-                    task.executableURL = URL(fileURLWithPath: executablePath)
-                    task.arguments = ["--conf-path=\(configPath)"]
+                // Setup pipes for stdout and stderr
+                let outputPipe = Pipe()
+                let errorPipe = Pipe()
+                task.standardOutput = outputPipe
+                task.standardError = errorPipe
+                
+                // Add termination handler
+                task.terminationHandler = { process in
+                    print("aria2c process terminated with status: \(process.terminationStatus)")
                     
-                    let pipe = Pipe()
-                    task.standardOutput = pipe
-                    task.standardError = pipe
-                    
-                    try task.run()
-                    
-                    // Read output for debugging
-                    DispatchQueue.global(qos: .background).async {
-                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                        if let output = String(data: data, encoding: .utf8) {
-                            print("Aria2 output: \(output)")
+                    // Auto-restart if the process terminates unexpectedly
+                    if process.terminationStatus != 0 && process.terminationStatus != 15 {
+                        print("Unexpected termination. Restarting aria2c...")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            self.startAria2Process(executablePath: executablePath, configPath: configPath, logPath: logPath)
                         }
                     }
-                    
-                    print("Aria2 daemon started successfully")
-                } catch {
-                    print("Failed to start aria2c: \(error)")
                 }
-            } else {
-                print("Could not find aria2c. Attempting to start Aria2 emulation mode...")
-                self.startAria2EmulationMode()
+                
+                // Start the process
+                try task.run()
+                print("aria2c process started successfully with PID: \(task.processIdentifier)")
+                
+                // Create a handler to monitor the stdout of the process
+                let outputFileHandle = outputPipe.fileHandleForReading
+                outputFileHandle.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty, let output = String(data: data, encoding: .utf8) {
+                        // Print any output from aria2c for debugging
+                        print("aria2c output: \(output)")
+                    }
+                }
+                
+                // Create a handler to monitor the stderr of the process
+                let errorFileHandle = errorPipe.fileHandleForReading
+                errorFileHandle.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if !data.isEmpty, let error = String(data: data, encoding: .utf8) {
+                        // Print any errors from aria2c
+                        print("aria2c error: \(error)")
+                    }
+                }
+            } catch {
+                print("Error starting aria2c process: \(error)")
+                print("Critical error - failed to start aria2c process - app cannot function properly without aria2c")
+                fatalError("Failed to start aria2c process: \(error)")
             }
         }
-    }
-    
-    private func findAria2cExecutable() -> String? {
-        // Common locations for aria2c
-        let possibleLocations = [
-            "/usr/local/bin/aria2c",        // Homebrew Intel
-            "/opt/homebrew/bin/aria2c",      // Homebrew Apple Silicon
-            "/usr/bin/aria2c",              // System
-            "/bin/aria2c",                  // Alternative system location
-            "\(NSHomeDirectory())/.aria2/aria2c"  // User's .aria2 directory
-        ]
-        
-        // Check each location
-        for location in possibleLocations {
-            if FileManager.default.fileExists(atPath: location) {
-                return location
-            }
-        }
-        
-        // Try using which command
-        do {
-            let whichTask = Process()
-            whichTask.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-            whichTask.arguments = ["aria2c"]
-            
-            let whichPipe = Pipe()
-            whichTask.standardOutput = whichPipe
-            
-            try whichTask.run()
-            whichTask.waitUntilExit()
-            
-            let whichData = whichPipe.fileHandleForReading.readDataToEndOfFile()
-            if let whichOutput = String(data: whichData, encoding: .utf8), !whichOutput.isEmpty {
-                let path = whichOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-                return path
-            }
-        } catch {
-            print("Error using which command: \(error)")
-        }
-        
-        return nil
-    }
-    
-    private func startAria2EmulationMode() {
-        print("Starting aria2 emulation mode - app will work but downloads won't be processed")
-        
-        // Set a notification to show when user tries to download
-        NotificationCenter.default.post(
-            name: NSNotification.Name("Aria2NotAvailable"),
-            object: nil,
-            userInfo: [
-                "message": "Aria2 daemon not found. Install aria2 with Homebrew: brew install aria2"
-            ]
-        )
     }
     
     var body: some Scene {

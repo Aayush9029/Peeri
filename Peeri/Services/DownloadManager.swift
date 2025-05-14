@@ -11,7 +11,6 @@ enum ConnectionState {
     case connecting
     case connected
     case failed(Error)
-    case emulation  // New state for when aria2 isn't available
 }
 
 @MainActor
@@ -109,33 +108,107 @@ class DownloadManager: ObservableObject {
     }
     
     private func checkConnectionAndStartTimer() {
-        // Allow a short delay for aria2 to start up
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        // Allow time for aria2c daemon to fully start up
+        logger.info("Scheduling connection verification with 4-second delay to allow daemon startup...")
+        connectionState = .connecting
+        
+        // Start update timer regardless to ensure UI updates
+        startUpdateTimer()
+        
+        // Retry connection with increasing delays until successful
+        attemptConnection(retryCount: 0, maxRetries: 30) // keep retrying for a long time
+    }
+    
+    private func attemptConnection(retryCount: Int, maxRetries: Int) {
+        // Calculate delay - start with smaller delays, then increase up to max of 10 seconds
+        let delay = min(Double(retryCount) * 1.0 + 2.0, 10.0) // 2s, 3s, 4s... up to 10s max
+        
+        guard retryCount <= maxRetries else {
+            logger.error("Maximum connection attempts reached. Continuing to retry indefinitely...")
+            // Start over with retries instead of giving up
+            attemptConnection(retryCount: 0, maxRetries: maxRetries)
+            return
+        }
+        
+        logger.info("Connection attempt \(retryCount + 1) scheduled in \(delay) seconds...")
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             Task {
-                await self.verifyConnection()
-                self.startUpdateTimer()
+                let success = await self.verifyConnection()
+                
+                if !success {
+                    self.attemptConnection(retryCount: retryCount + 1, maxRetries: maxRetries)
+                }
             }
         }
     }
     
-    private func verifyConnection() async {
+    private func verifyConnection() async -> Bool {
         do {
             logger.info("Verifying connection to aria2...")
-            let version = try await aria2Client.getVersion()
+            connectionState = .connecting
+            
+            let version = try await withTimeout(seconds: 3.0) {
+                return try await self.aria2Client.getVersion()
+            }
+            
             logger.info("Connected to aria2 version: \(version)")
             connectionState = .connected
             lastError = nil
+            return true
+        } catch let timeoutError as TimeoutError {
+            logger.error("Connection timed out: \(timeoutError.localizedDescription)")
+            connectionState = .failed(timeoutError)
+            lastError = "Connection timed out. Aria2 daemon may still be starting."
+            return false
         } catch {
             logger.error("Failed to connect to aria2: \(error.localizedDescription)")
             connectionState = .failed(error)
             lastError = "Failed to connect to aria2: \(error.localizedDescription)"
-            
-            // Retry connection after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                Task {
-                    await self.verifyConnection()
+            return false
+        }
+    }
+    
+    // Helper to add timeout to async calls
+    private func withTimeout<T>(seconds: Double, operation: @escaping () async throws -> T) async throws -> T {
+        return try await withTaskGroup(of: Result<T, Error>.self) { group in
+            // Add the actual operation
+            group.addTask {
+                do {
+                    return .success(try await operation())
+                } catch {
+                    return .failure(error)
                 }
             }
+            
+            // Add a timeout task
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                return .failure(TimeoutError())
+            }
+            
+            // Return the first result and cancel the other task
+            guard let result = await group.next() else {
+                fatalError("Task group returned no results, which should never happen")
+            }
+            
+            // Cancel the remaining task
+            group.cancelAll()
+            
+            // Process the result
+            switch result {
+            case .success(let value):
+                return value
+            case .failure(let error):
+                throw error
+            }
+        }
+    }
+    
+    // Custom error for timeouts
+    private struct TimeoutError: Error, LocalizedError {
+        var errorDescription: String? {
+            return "Operation timed out"
         }
     }
     
@@ -152,11 +225,7 @@ class DownloadManager: ObservableObject {
     }
     
     func addDownload(url: URL) async {
-        // Use emulation mode if aria2 is not available
-        if case .emulation = connectionState {
-            await addEmulatedDownload(url: url)
-            return
-        }
+        // Always use real aria2c
         
         do {
             let options: [String: String] = [
@@ -180,59 +249,11 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    private func addEmulatedDownload(url: URL) async {
-        // Create a fake download with random size for emulation mode
-        let fileName = url.lastPathComponent.isEmpty ? "download-\(UUID().uuidString.prefix(8))" : url.lastPathComponent
-        let fileSize = Int64.random(in: 50_000_000...5_000_000_000) // Random size between 50MB and 5GB
-        
-        let newDownload = DownloadFile(
-            url: url,
-            fileName: fileName,
-            fileSize: fileSize,
-            downloadedSize: 0,
-            status: .downloading
-        )
-        
-        downloads.append(newDownload)
-        activeDownloads.append(newDownload)
-        
-        // Simulate download progress over time
-        Task {
-            for _ in 1...10 {
-                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                await updateEmulatedDownload(download: newDownload)
-            }
-        }
-    }
-    
-    private func updateEmulatedDownload(download: DownloadFile) async {
-        guard let index = downloads.firstIndex(where: { $0.id == download.id }),
-              let activeIndex = activeDownloads.firstIndex(where: { $0.id == download.id }),
-              let fileSize = download.fileSize else {
-            return
-        }
-        
-        // Increment download size by 10-20%
-        let increment = Int64(Double(fileSize) * Double.random(in: 0.1...0.2))
-        let newDownloadedSize = min(downloads[index].downloadedSize + increment, fileSize)
-        downloads[index].downloadedSize = newDownloadedSize
-        activeDownloads[activeIndex].downloadedSize = newDownloadedSize
-        
-        // Complete the download if it's finished
-        if newDownloadedSize >= fileSize {
-            downloads[index].status = .completed
-            downloads[index].completedAt = Date()
-            let download = activeDownloads.remove(at: activeIndex)
-            completedDownloads.append(download)
-        }
-    }
+    // Methods for emulation removed as we never use emulation mode.
+    // The app will always use the real aria2c executable.
     
     func pauseDownload(_ download: DownloadFile) async {
-        // Use emulation mode if aria2 is not available
-        if case .emulation = connectionState {
-            await pauseEmulatedDownload(download)
-            return
-        }
+        // Always use real aria2c
         
         do {
             let success = try await aria2Client.pause(download.id.uuidString)
@@ -264,11 +285,7 @@ class DownloadManager: ObservableObject {
     }
     
     func resumeDownload(_ download: DownloadFile) async {
-        // Use emulation mode if aria2 is not available
-        if case .emulation = connectionState {
-            await resumeEmulatedDownload(download)
-            return
-        }
+        // Always use real aria2c
         
         do {
             let success = try await aria2Client.unpause(download.id.uuidString)
@@ -308,11 +325,7 @@ class DownloadManager: ObservableObject {
     }
     
     func cancelDownload(_ download: DownloadFile) async {
-        // Use emulation mode if aria2 is not available
-        if case .emulation = connectionState {
-            await cancelEmulatedDownload(download)
-            return
-        }
+        // Always use real aria2c
         
         do {
             let success = try await aria2Client.remove(download.id.uuidString)
@@ -358,12 +371,7 @@ class DownloadManager: ObservableObject {
     }
     
     private func updateDownloads() async {
-        // For emulation mode, update the download rates periodically
-        if case .emulation = connectionState {
-            // Just update the simulated rates
-            updateEmulationStatistics()
-            return
-        }
+        // Always use real aria2c
         
         do {
             // Skip update if not connected
@@ -401,16 +409,7 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    private func updateEmulationStatistics() {
-        // Simulate fluctuating download/upload rates
-        if !activeDownloads.isEmpty {
-            totalDownloadRate = Int64(Double(totalDownloadRate) * Double.random(in: 0.9...1.1))
-            totalUploadRate = Int64(Double(totalUploadRate) * Double.random(in: 0.8...1.2))
-        } else {
-            totalDownloadRate = 0
-            totalUploadRate = 0
-        }
-    }
+    // Emulation functions removed as we always use the real aria2c
     
     private func updateStatistics(_ activeFiles: [DownloadFile]) {
         // Calculate total download/upload rates
