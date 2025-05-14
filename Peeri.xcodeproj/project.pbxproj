@@ -3,38 +3,42 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		456853EC2A0A2E3C0081389F /* PeeriApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853EB2A0A2E3C0081389F /* PeeriApp.swift */; };
-		456853EE2A0A2E3C0081389F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853ED2A0A2E3C0081389F /* ContentView.swift */; };
-		456853F02A0A2E3D0081389F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 456853EF2A0A2E3D0081389F /* Assets.xcassets */; };
-		456853F32A0A2E3D0081389F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 456853F22A0A2E3D0081389F /* Preview Assets.xcassets */; };
-		456853FD2A0A2F1B0081389F /* SideBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853FC2A0A2F1B0081389F /* SideBar.swift */; };
-		456853FF2A0A34470081389F /* SeedsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456853FE2A0A34470081389F /* SeedsView.swift */; };
-		456854022A0A3C590081389F /* TransferView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456854012A0A3C590081389F /* TransferView.swift */; };
-		456854042A0A47D10081389F /* VisualEffect+View.swift in Sources */ = {isa = PBXBuildFile; fileRef = 456854032A0A47D10081389F /* VisualEffect+View.swift */; };
+		5114449E2DD5508900FC3129 /* AnalyticsClient in Frameworks */ = {isa = PBXBuildFile; productRef = 5114449D2DD5508900FC3129 /* AnalyticsClient */; };
+		511444A02DD5508900FC3129 /* Aria2Client in Frameworks */ = {isa = PBXBuildFile; productRef = 5114449F2DD5508900FC3129 /* Aria2Client */; };
+		511444A22DD5508900FC3129 /* Assets in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A12DD5508900FC3129 /* Assets */; };
+		511444A42DD5508900FC3129 /* ClipboardClient in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A32DD5508900FC3129 /* ClipboardClient */; };
+		511444A62DD5508900FC3129 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A52DD5508900FC3129 /* Models */; };
+		511444AA2DD5508900FC3129 /* UI in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A92DD5508900FC3129 /* UI */; };
+		511444AC2DD550E300FC3129 /* Shared in Frameworks */ = {isa = PBXBuildFile; productRef = 511444AB2DD550E300FC3129 /* Shared */; };
+		511444AE2DD553B900FC3129 /* aria2c in Resources */ = {isa = PBXBuildFile; fileRef = 511444AD2DD553B900FC3129 /* aria2c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		456853E82A0A2E3C0081389F /* Peeri.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Peeri.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		456853EB2A0A2E3C0081389F /* PeeriApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeeriApp.swift; sourceTree = "<group>"; };
-		456853ED2A0A2E3C0081389F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		456853EF2A0A2E3D0081389F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		456853F22A0A2E3D0081389F /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		456853F42A0A2E3D0081389F /* Peeri.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Peeri.entitlements; sourceTree = "<group>"; };
-		456853FC2A0A2F1B0081389F /* SideBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SideBar.swift; sourceTree = "<group>"; };
-		456853FE2A0A34470081389F /* SeedsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedsView.swift; sourceTree = "<group>"; };
-		456854012A0A3C590081389F /* TransferView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransferView.swift; sourceTree = "<group>"; };
-		456854032A0A47D10081389F /* VisualEffect+View.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VisualEffect+View.swift"; sourceTree = "<group>"; };
+		5114447F2DD54CD300FC3129 /* PeerKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = PeerKit; sourceTree = "<group>"; };
+		511444AD2DD553B900FC3129 /* aria2c */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = aria2c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		511444742DD54C9C00FC3129 /* Peeri */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Peeri; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		456853E52A0A2E3C0081389F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				511444A62DD5508900FC3129 /* Models in Frameworks */,
+				5114449E2DD5508900FC3129 /* AnalyticsClient in Frameworks */,
+				511444AC2DD550E300FC3129 /* Shared in Frameworks */,
+				511444A22DD5508900FC3129 /* Assets in Frameworks */,
+				511444AA2DD5508900FC3129 /* UI in Frameworks */,
+				511444A42DD5508900FC3129 /* ClipboardClient in Frameworks */,
+				511444A02DD5508900FC3129 /* Aria2Client in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -44,8 +48,11 @@
 		456853DF2A0A2E3C0081389F = {
 			isa = PBXGroup;
 			children = (
-				456853EA2A0A2E3C0081389F /* Peeri */,
+				5114447F2DD54CD300FC3129 /* PeerKit */,
+				511444742DD54C9C00FC3129 /* Peeri */,
+				5114449C2DD5508900FC3129 /* Frameworks */,
 				456853E92A0A2E3C0081389F /* Products */,
+				511444AD2DD553B900FC3129 /* aria2c */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,52 +64,11 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		456853EA2A0A2E3C0081389F /* Peeri */ = {
+		5114449C2DD5508900FC3129 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				456853EB2A0A2E3C0081389F /* PeeriApp.swift */,
-				456853ED2A0A2E3C0081389F /* ContentView.swift */,
-				456854032A0A47D10081389F /* VisualEffect+View.swift */,
-				456853FA2A0A2EE70081389F /* Views */,
-				456853EF2A0A2E3D0081389F /* Assets.xcassets */,
-				456853F42A0A2E3D0081389F /* Peeri.entitlements */,
-				456853F12A0A2E3D0081389F /* Preview Content */,
 			);
-			path = Peeri;
-			sourceTree = "<group>";
-		};
-		456853F12A0A2E3D0081389F /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				456853F22A0A2E3D0081389F /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		456853FA2A0A2EE70081389F /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				456853FB2A0A2EEB0081389F /* Sidebar */,
-				456854002A0A3C480081389F /* Seeds */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		456853FB2A0A2EEB0081389F /* Sidebar */ = {
-			isa = PBXGroup;
-			children = (
-				456853FC2A0A2F1B0081389F /* SideBar.swift */,
-			);
-			path = Sidebar;
-			sourceTree = "<group>";
-		};
-		456854002A0A3C480081389F /* Seeds */ = {
-			isa = PBXGroup;
-			children = (
-				456853FE2A0A34470081389F /* SeedsView.swift */,
-				456854012A0A3C590081389F /* TransferView.swift */,
-			);
-			path = Seeds;
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -120,6 +86,9 @@
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				511444742DD54C9C00FC3129 /* Peeri */,
+			);
 			name = Peeri;
 			productName = Peeri;
 			productReference = 456853E82A0A2E3C0081389F /* Peeri.app */;
@@ -133,7 +102,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1430;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					456853E72A0A2E3C0081389F = {
 						CreatedOnToolsVersion = 14.3;
@@ -163,8 +132,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				456853F32A0A2E3D0081389F /* Preview Assets.xcassets in Resources */,
-				456853F02A0A2E3D0081389F /* Assets.xcassets in Resources */,
+				511444AE2DD553B900FC3129 /* aria2c in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -175,12 +143,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				456853EE2A0A2E3C0081389F /* ContentView.swift in Sources */,
-				456854042A0A47D10081389F /* VisualEffect+View.swift in Sources */,
-				456854022A0A3C590081389F /* TransferView.swift in Sources */,
-				456853FF2A0A34470081389F /* SeedsView.swift in Sources */,
-				456853FD2A0A2F1B0081389F /* SideBar.swift in Sources */,
-				456853EC2A0A2E3C0081389F /* PeeriApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -191,6 +153,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -220,9 +183,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 4538W4A79B;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -251,6 +217,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -280,9 +247,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 4538W4A79B;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -309,9 +279,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Peeri/Preview Content\"";
-				DEVELOPMENT_TEAM = 4538W4A79B;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -336,9 +306,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"Peeri/Preview Content\"";
-				DEVELOPMENT_TEAM = 4538W4A79B;
-				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -376,6 +346,37 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5114449D2DD5508900FC3129 /* AnalyticsClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AnalyticsClient;
+		};
+		5114449F2DD5508900FC3129 /* Aria2Client */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Aria2Client;
+		};
+		511444A12DD5508900FC3129 /* Assets */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Assets;
+		};
+		511444A32DD5508900FC3129 /* ClipboardClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ClipboardClient;
+		};
+		511444A52DD5508900FC3129 /* Models */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Models;
+		};
+		511444A92DD5508900FC3129 /* UI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UI;
+		};
+		511444AB2DD550E300FC3129 /* Shared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Shared;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 456853E02A0A2E3C0081389F /* Project object */;
 }

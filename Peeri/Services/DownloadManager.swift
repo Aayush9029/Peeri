@@ -2,9 +2,9 @@ import Aria2Client
 import Combine
 import Foundation
 import Models
+import os.log
 import Shared
 import SwiftUI
-import os.log
 
 enum ConnectionState {
     case disconnected
@@ -55,55 +55,13 @@ class DownloadManager: ObservableObject {
             } else {
                 lastError = "Aria2 is not available. Please install it to enable downloads."
             }
-            connectionState = .emulation
-            
-            // Add sample downloads for UI testing in emulation mode
-            addSampleDownloads()
+            connectionState = .failed(NSError(domain: "Aria2ClientError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Aria2 daemon not available"]))
         }
-    }
-    
-    private func addSampleDownloads() {
-        // Only add sample downloads if we're in emulation mode and have no downloads
-        guard case .emulation = connectionState, downloads.isEmpty else { return }
-        
-        let sampleDownloads = [
-            DownloadFile(
-                url: URL(string: "https://example.com/sample1.mp4")!,
-                fileName: "sample_video.mp4",
-                fileSize: 1_073_741_824, // 1GB
-                downloadedSize: 536_870_912, // 50%
-                status: .downloading
-            ),
-            DownloadFile(
-                url: URL(string: "https://example.com/sample2.zip")!,
-                fileName: "sample_archive.zip",
-                fileSize: 536_870_912, // 512MB
-                downloadedSize: 536_870_912, // 100%
-                status: .completed,
-                completedAt: Date()
-            ),
-            DownloadFile(
-                url: URL(string: "https://example.com/sample3.iso")!,
-                fileName: "sample_image.iso",
-                fileSize: 4_294_967_296, // 4GB
-                downloadedSize: 1_073_741_824, // 25%
-                status: .paused
-            )
-        ]
-        
-        downloads = sampleDownloads
-        activeDownloads = [sampleDownloads[0]]
-        pausedDownloads = [sampleDownloads[2]]
-        completedDownloads = [sampleDownloads[1]]
-        
-        // Set some sample transfer rates
-        totalDownloadRate = 5_242_880 // 5MB/s
-        totalUploadRate = 1_048_576  // 1MB/s
     }
     
     private func initializeAria2Client() {
         connectionState = .connecting
-        logger.info("Initializing Aria2 client with host: \(self.aria2Host), port: \(self.aria2Port)")
+        print("Initializing Aria2 client with host: \(aria2Host), port: \(aria2Port)")
         aria2Client.initialize(false, aria2Host, aria2Port, aria2Token)
     }
     
@@ -149,7 +107,7 @@ class DownloadManager: ObservableObject {
             connectionState = .connecting
             
             let version = try await withTimeout(seconds: 3.0) {
-                return try await self.aria2Client.getVersion()
+                try await self.aria2Client.getVersion()
             }
             
             logger.info("Connected to aria2 version: \(version)")
@@ -171,11 +129,11 @@ class DownloadManager: ObservableObject {
     
     // Helper to add timeout to async calls
     private func withTimeout<T>(seconds: Double, operation: @escaping () async throws -> T) async throws -> T {
-        return try await withTaskGroup(of: Result<T, Error>.self) { group in
+        return try await withThrowingTaskGroup(of: Result<T, Error>.self) { group in
             // Add the actual operation
             group.addTask {
                 do {
-                    return .success(try await operation())
+                    return try .success(await operation())
                 } catch {
                     return .failure(error)
                 }
@@ -183,12 +141,16 @@ class DownloadManager: ObservableObject {
             
             // Add a timeout task
             group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(seconds * 1000000000))
+                } catch {
+                    // Handle cancellation
+                }
                 return .failure(TimeoutError())
             }
             
             // Return the first result and cancel the other task
-            guard let result = await group.next() else {
+            guard let result = try await group.next() else {
                 fatalError("Task group returned no results, which should never happen")
             }
             
@@ -225,8 +187,6 @@ class DownloadManager: ObservableObject {
     }
     
     func addDownload(url: URL) async {
-        // Always use real aria2c
-        
         do {
             let options: [String: String] = [
                 "dir": NSHomeDirectory() + "/Downloads",
@@ -249,12 +209,7 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    // Methods for emulation removed as we never use emulation mode.
-    // The app will always use the real aria2c executable.
-    
     func pauseDownload(_ download: DownloadFile) async {
-        // Always use real aria2c
-        
         do {
             let success = try await aria2Client.pause(download.id.uuidString)
             if success {
@@ -273,20 +228,7 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    private func pauseEmulatedDownload(_ download: DownloadFile) async {
-        if let index = downloads.firstIndex(where: { $0.id == download.id }) {
-            downloads[index].status = .paused
-            
-            if let activeIndex = activeDownloads.firstIndex(where: { $0.id == download.id }) {
-                let download = activeDownloads.remove(at: activeIndex)
-                pausedDownloads.append(download)
-            }
-        }
-    }
-    
     func resumeDownload(_ download: DownloadFile) async {
-        // Always use real aria2c
-        
         do {
             let success = try await aria2Client.unpause(download.id.uuidString)
             if success {
@@ -305,28 +247,7 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    private func resumeEmulatedDownload(_ download: DownloadFile) async {
-        if let index = downloads.firstIndex(where: { $0.id == download.id }) {
-            downloads[index].status = .downloading
-            
-            if let pausedIndex = pausedDownloads.firstIndex(where: { $0.id == download.id }) {
-                let download = pausedDownloads.remove(at: pausedIndex)
-                activeDownloads.append(download)
-                
-                // Continue simulating download progress
-                Task {
-                    for _ in 1...5 {
-                        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                        await updateEmulatedDownload(download: download)
-                    }
-                }
-            }
-        }
-    }
-    
     func cancelDownload(_ download: DownloadFile) async {
-        // Always use real aria2c
-        
         do {
             let success = try await aria2Client.remove(download.id.uuidString)
             if success {
@@ -352,27 +273,7 @@ class DownloadManager: ObservableObject {
         }
     }
     
-    private func cancelEmulatedDownload(_ download: DownloadFile) async {
-        if let index = downloads.firstIndex(where: { $0.id == download.id }) {
-            downloads.remove(at: index)
-            
-            if let activeIndex = activeDownloads.firstIndex(where: { $0.id == download.id }) {
-                activeDownloads.remove(at: activeIndex)
-            }
-            
-            if let pausedIndex = pausedDownloads.firstIndex(where: { $0.id == download.id }) {
-                pausedDownloads.remove(at: pausedIndex)
-            }
-            
-            if let completedIndex = completedDownloads.firstIndex(where: { $0.id == download.id }) {
-                completedDownloads.remove(at: completedIndex)
-            }
-        }
-    }
-    
     private func updateDownloads() async {
-        // Always use real aria2c
-        
         do {
             // Skip update if not connected
             if case .connected = connectionState {
@@ -408,8 +309,6 @@ class DownloadManager: ObservableObject {
             connectionState = .failed(error)
         }
     }
-    
-    // Emulation functions removed as we always use the real aria2c
     
     private func updateStatistics(_ activeFiles: [DownloadFile]) {
         // Calculate total download/upload rates

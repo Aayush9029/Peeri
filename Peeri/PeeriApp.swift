@@ -17,7 +17,8 @@ struct PeeriApp: App {
         
         // If not found in the main bundle, check if it's in the root directory
         if aria2cPath == nil {
-            let rootPath = Bundle.main.bundlePath.deletingLastPathComponent
+            let bundlePath = Bundle.main.bundlePath
+            let rootPath = (bundlePath as NSString).deletingLastPathComponent
             let potentialPath = rootPath + "/aria2c"
             
             if FileManager.default.fileExists(atPath: potentialPath) {

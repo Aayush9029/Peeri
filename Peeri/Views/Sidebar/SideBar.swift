@@ -121,8 +121,6 @@ struct ConnectionStatusView: View {
             return .green
         case .connecting:
             return .orange
-        case .emulation:
-            return .blue
         case .disconnected:
             return .red
         case .failed:
@@ -140,8 +138,6 @@ struct ConnectionStatusView: View {
             return "Connecting..."
         case .disconnected:
             return "Disconnected"
-        case .emulation:
-            return "Emulation Mode"
         case .failed(let error):
             return "Error: \(error.localizedDescription)"
         @unknown default:
