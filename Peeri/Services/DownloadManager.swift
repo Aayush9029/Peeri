@@ -33,10 +33,81 @@ class DownloadManager: ObservableObject {
     private let aria2Token = "peeri"
     private let logger = Logger(subsystem: "com.lovedoingthings.peeri", category: "DownloadManager")
     
+    // File system paths for tracking downloads
+    private let baseDownloadDir: URL
+    private let downloadingDir: URL
+    private let pausedDir: URL 
+    private let completedDir: URL
+    private let metadataDir: URL
+    
     init() {
+        // Setup directory structure for tracking downloads
+        let documentDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        baseDownloadDir = documentDir.appendingPathComponent("peeri/downloads", isDirectory: true)
+        downloadingDir = baseDownloadDir.appendingPathComponent("downloading", isDirectory: true)
+        pausedDir = baseDownloadDir.appendingPathComponent("paused", isDirectory: true) 
+        completedDir = baseDownloadDir.appendingPathComponent("completed", isDirectory: true)
+        metadataDir = baseDownloadDir.appendingPathComponent("metadata", isDirectory: true)
+        
+        // Create the directory structure
+        createDirectoryStructure()
+        
+        // Load existing downloads from file system
+        loadDownloadsFromFileSystem()
+        
         setupNotificationObservers()
         initializeAria2Client()
         checkConnectionAndStartTimer()
+    }
+    
+    private func createDirectoryStructure() {
+        let directories = [baseDownloadDir, downloadingDir, pausedDir, completedDir, metadataDir]
+        
+        for directory in directories {
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                print("Created directory: \(directory.path)")
+            } catch {
+                print("Error creating directory \(directory.path): \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    private func loadDownloadsFromFileSystem() {
+        // Load metadata files from the metadata directory
+        do {
+            let metadataFiles = try FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil)
+            
+            for metadataFile in metadataFiles {
+                if metadataFile.pathExtension == "json" {
+                    do {
+                        let data = try Data(contentsOf: metadataFile)
+                        let decoder = JSONDecoder()
+                        let download = try decoder.decode(DownloadFile.self, from: data)
+                        
+                        // Add to our lists based on status
+                        downloads.append(download)
+                        
+                        switch download.status {
+                        case .downloading:
+                            activeDownloads.append(download)
+                        case .paused:
+                            pausedDownloads.append(download)
+                        case .completed:
+                            completedDownloads.append(download)
+                        default:
+                            break
+                        }
+                    } catch {
+                        print("Error loading download metadata from \(metadataFile.path): \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+            print("Loaded \(downloads.count) downloads from file system")
+        } catch {
+            print("Error reading metadata directory: \(error.localizedDescription)")
+        }
     }
     
     private func setupNotificationObservers() {
@@ -188,21 +259,63 @@ class DownloadManager: ObservableObject {
     
     func addDownload(url: URL) async {
         do {
+            // Use FileManager to ensure we have a clean path
+            let downloadDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!.path
+            
+            // Create options with clean path and file name
             let options: [String: String] = [
-                "dir": NSHomeDirectory() + "/Downloads",
-                "out": url.lastPathComponent
+                "dir": downloadDir,
+                "out": url.lastPathComponent.isEmpty ? "download" : url.lastPathComponent
             ]
             
-            _ = try await aria2Client.addDownload(url, options)
+            let gid = try await aria2Client.addDownload(url, options)
+            print("Added download with GID: \(gid)")
             
+            // Store the GID explicitly (we could use this to match up with returned downloads)
+            print("After adding download, manually checking stopped downloads")
+            let stoppedFiles = try await aria2Client.tellStopped(0, 100)
+            for file in stoppedFiles {
+                print("  Existing stopped file: \(file.id) - \(file.fileName) - Status: \(file.status.rawValue)")
+            }
+            
+            // Create a new download file object with the given URL
             let newDownload = DownloadFile(
+                id: UUID(uuidString: gid.replacingOccurrences(of: "^[a-f0-9]{16}$", with: "$0-0000-0000-0000-000000000000", options: .regularExpression)) ?? UUID(),
                 url: url,
-                fileName: url.lastPathComponent,
+                fileName: url.lastPathComponent.isEmpty ? "download" : url.lastPathComponent,
                 status: .downloading
             )
             
-            downloads.append(newDownload)
-            activeDownloads.append(newDownload)
+            print("Created new download with ID: \(newDownload.id.uuidString) for file: \(newDownload.fileName)")
+            
+            // Check if the download is already completed
+            let stopResponse = try await aria2Client.tellStatus(gid)
+            
+            // Update status based on response
+            var downloadToSave = newDownload
+            if stopResponse == .completed {
+                print("Download already completed, marking as completed")
+                downloadToSave.status = .completed
+                downloadToSave.completedAt = Date()
+                
+                // Add to our tracking lists
+                downloads.append(downloadToSave)
+                completedDownloads.append(downloadToSave)
+            } else {
+                // Add to our tracking lists
+                downloads.append(downloadToSave)
+                activeDownloads.append(downloadToSave)
+            }
+            
+            // Save download metadata to disk
+            saveDownloadMetadata(downloadToSave)
+            
+            print("Download added - Current counts: Active=\(activeDownloads.count), Completed=\(completedDownloads.count)")
+            
+            // Force an immediate update
+            Task {
+                await updateDownloads()
+            }
         } catch {
             logger.error("Failed to add download: \(error.localizedDescription)")
             lastError = "Failed to add download: \(error.localizedDescription)"
@@ -214,13 +327,20 @@ class DownloadManager: ObservableObject {
             let success = try await aria2Client.pause(download.id.uuidString)
             if success {
                 if let index = downloads.firstIndex(where: { $0.id == download.id }) {
-                    downloads[index].status = .paused
+                    var updatedDownload = downloads[index]
+                    updatedDownload.status = .paused
+                    downloads[index] = updatedDownload
+                    
+                    // Save updated status to filesystem
+                    saveDownloadMetadata(updatedDownload)
                 }
                 
                 if let index = activeDownloads.firstIndex(where: { $0.id == download.id }) {
                     let download = activeDownloads.remove(at: index)
                     pausedDownloads.append(download)
                 }
+                
+                print("Download paused: \(download.fileName)")
             }
         } catch {
             logger.error("Failed to pause download: \(error.localizedDescription)")
@@ -233,13 +353,20 @@ class DownloadManager: ObservableObject {
             let success = try await aria2Client.unpause(download.id.uuidString)
             if success {
                 if let index = downloads.firstIndex(where: { $0.id == download.id }) {
-                    downloads[index].status = .downloading
+                    var updatedDownload = downloads[index]
+                    updatedDownload.status = .downloading
+                    downloads[index] = updatedDownload
+                    
+                    // Save updated status to filesystem
+                    saveDownloadMetadata(updatedDownload)
                 }
                 
                 if let index = pausedDownloads.firstIndex(where: { $0.id == download.id }) {
                     let download = pausedDownloads.remove(at: index)
                     activeDownloads.append(download)
                 }
+                
+                print("Download resumed: \(download.fileName)")
             }
         } catch {
             logger.error("Failed to resume download: \(error.localizedDescription)")
@@ -251,6 +378,19 @@ class DownloadManager: ObservableObject {
         do {
             let success = try await aria2Client.remove(download.id.uuidString)
             if success {
+                // Remove metadata file
+                let metadataPath = metadataDir.appendingPathComponent("\(download.id.uuidString).json")
+                try? FileManager.default.removeItem(at: metadataPath)
+                
+                // Remove symlinks in status folders
+                for directory in [downloadingDir, pausedDir, completedDir] {
+                    let linkPath = directory.appendingPathComponent(download.fileName)
+                    if FileManager.default.fileExists(atPath: linkPath.path) {
+                        try? FileManager.default.removeItem(at: linkPath)
+                    }
+                }
+                
+                // Remove from in-memory lists
                 if let index = downloads.firstIndex(where: { $0.id == download.id }) {
                     downloads.remove(at: index)
                 }
@@ -266,6 +406,8 @@ class DownloadManager: ObservableObject {
                 if let index = completedDownloads.firstIndex(where: { $0.id == download.id }) {
                     completedDownloads.remove(at: index)
                 }
+                
+                print("Download canceled and removed: \(download.fileName)")
             }
         } catch {
             logger.error("Failed to cancel download: \(error.localizedDescription)")
@@ -275,19 +417,43 @@ class DownloadManager: ObservableObject {
     
     private func updateDownloads() async {
         do {
+            // Also update from the filesystem regardless of connection state
+            await updateDownloadsFromFileSystem()
+            
             // Skip update if not connected
             if case .connected = connectionState {
                 // Get active downloads
                 let activeFiles = try await aria2Client.tellActive()
                 
                 // Get waiting downloads
-                let waitingFiles = try await aria2Client.tellWaiting(0, 10)
+                let waitingFiles = try await aria2Client.tellWaiting(0, 30)
                 
-                // Get stopped downloads
-                let stoppedFiles = try await aria2Client.tellStopped(0, 10)
+                // Get stopped downloads - increase the number to handle more completed downloads
+                let stoppedFiles = try await aria2Client.tellStopped(0, 100)
+                
+                // Debug log stopped files details
+                print("Stopped files received from aria2: \(stoppedFiles.count)")
+                for file in stoppedFiles {
+                    print("  Stopped file: \(file.id) - \(file.fileName) - Status: \(file.status.rawValue)")
+                }
                 
                 // Update statistics
                 updateStatistics(activeFiles)
+                
+                // Log the active downloads to see progress
+                if !activeFiles.isEmpty {
+                    logger.info("Active downloads: \(activeFiles.count)")
+                    for download in activeFiles {
+                        let progressPercent = String(format: "%.1f%%", download.progress * 100)
+                        // MUST USE PRINT HERE
+                        print("\(download.fileName): \(progressPercent) complete, \(formatBytes(download.downloadedSize))/\(formatBytes(download.fileSize ?? 0))")
+                    }
+                }
+                
+                // Log completed downloads
+                if !stoppedFiles.filter({ $0.status == .completed }).isEmpty {
+                    logger.info("Completed downloads: \(stoppedFiles.filter { $0.status == .completed }.count)")
+                }
                 
                 // Update our model
                 updateDownloadList(active: activeFiles, waiting: waitingFiles, stopped: stoppedFiles)
@@ -299,7 +465,7 @@ class DownloadManager: ObservableObject {
                 }
             } else if case .failed = connectionState {
                 // Try to reconnect if failed
-                await verifyConnection()
+                _ = await verifyConnection()
             }
         } catch {
             logger.error("Failed to update downloads: \(error.localizedDescription)")
@@ -310,30 +476,198 @@ class DownloadManager: ObservableObject {
         }
     }
     
+    private func updateDownloadsFromFileSystem() async {
+        // This is a fallback method to ensure downloads are still displayed
+        // even if Aria2 is not communicating properly
+        
+        do {
+            print("Updating downloads from filesystem...")
+            
+            // Reset in-memory lists
+            var newDownloads: [DownloadFile] = []
+            var newActiveDownloads: [DownloadFile] = []
+            var newPausedDownloads: [DownloadFile] = []
+            var newCompletedDownloads: [DownloadFile] = []
+            
+            // Read all metadata files
+            let metadataFiles = try FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil)
+            
+            for metadataFile in metadataFiles {
+                if metadataFile.pathExtension == "json" {
+                    do {
+                        let data = try Data(contentsOf: metadataFile)
+                        let decoder = JSONDecoder()
+                        let download = try decoder.decode(DownloadFile.self, from: data)
+                        
+                        // Add to our lists based on status
+                        newDownloads.append(download)
+                        
+                        switch download.status {
+                        case .downloading:
+                            newActiveDownloads.append(download)
+                        case .paused:
+                            newPausedDownloads.append(download)
+                        case .completed:
+                            newCompletedDownloads.append(download)
+                        default:
+                            break
+                        }
+                    } catch {
+                        print("Error loading download metadata from \(metadataFile.path): \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+            // Update our UI state only if we have downloads from the filesystem
+            if !newDownloads.isEmpty {
+                print("Found \(newDownloads.count) downloads in filesystem")
+                
+                // Only update if the number of downloads has changed
+                if newDownloads.count != downloads.count {
+                    downloads = newDownloads
+                    activeDownloads = newActiveDownloads
+                    pausedDownloads = newPausedDownloads
+                    completedDownloads = newCompletedDownloads
+                    
+                    print("Updated download lists from filesystem - Downloads: \(downloads.count), Active: \(activeDownloads.count), Paused: \(pausedDownloads.count), Completed: \(completedDownloads.count)")
+                }
+            }
+        } catch {
+            print("Error updating downloads from filesystem: \(error.localizedDescription)")
+        }
+    }
+    
     private func updateStatistics(_ activeFiles: [DownloadFile]) {
         // Calculate total download/upload rates
         var dlRate: Int64 = 0
         var ulRate: Int64 = 0
         
         for download in activeFiles {
-            // We'd get the rates from Aria2 responses
-            // This is a placeholder
-            dlRate += 1000000 // 1MB/s
-            ulRate += 500000 // 0.5MB/s
+            // Use actual download rates from the files when available
+            if let downloadSpeed = download.downloadSpeed {
+                dlRate += downloadSpeed
+            }
+            
+            if let uploadSpeed = download.uploadSpeed {
+                ulRate += uploadSpeed
+            }
         }
         
+        // If no active downloads or rates not available, reset to 0
         totalDownloadRate = dlRate
         totalUploadRate = ulRate
+        
+        // Log the rates for debugging
+        if dlRate > 0 {
+            // MUST USE PRINT HERE
+            print("Current download rate: \(formatBytes(dlRate))/s, upload rate: \(formatBytes(ulRate))/s")
+        }
+    }
+    
+    private func formatBytes(_ bytes: Int64) -> String {
+        let units = ["B", "KB", "MB", "GB", "TB"]
+        var value = Double(bytes)
+        var unitIndex = 0
+        
+        while value > 1024 && unitIndex < units.count - 1 {
+            value /= 1024
+            unitIndex += 1
+        }
+        
+        return String(format: "%.2f %@", value, units[unitIndex])
     }
     
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
-        // Update main list
-        downloads = active + waiting + stopped
+        // Log current state
+        print("Updating download lists - Active: \(active.count), Waiting: \(waiting.count), Stopped: \(stopped.count)")
         
-        // Update category lists
+        // Update main list
+        let newDownloads = active + waiting + stopped
+        
+        // Save new downloads to the filesystem and update our lists
+        for download in newDownloads {
+            // Check if this is a new download we haven't seen before
+            if !downloads.contains(where: { $0.id == download.id }) {
+                saveDownloadMetadata(download)
+            } 
+            // Check if status has changed
+            else if let existingIndex = downloads.firstIndex(where: { $0.id == download.id }),
+                    downloads[existingIndex].status != download.status {
+                // Status changed, update the metadata
+                saveDownloadMetadata(download)
+            }
+        }
+        
+        // Update our in-memory lists
+        downloads = newDownloads
         activeDownloads = active
         pausedDownloads = waiting
         completedDownloads = stopped.filter { $0.status == .completed }
+        
+        // Debug log the current state
+        print("Updated download lists - Downloads: \(downloads.count), Active: \(activeDownloads.count), Paused: \(pausedDownloads.count), Completed: \(completedDownloads.count)")
+        
+        // Print details of each download
+        for download in downloads {
+            print("Download in list: \(download.id.uuidString) - \(download.fileName) - Status: \(download.status.rawValue)")
+        }
+    }
+    
+    private func saveDownloadMetadata(_ download: DownloadFile) {
+        // Create a filename based on the download ID
+        let metadataPath = metadataDir.appendingPathComponent("\(download.id.uuidString).json")
+        
+        do {
+            // Encode the download to JSON
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .prettyPrinted
+            let data = try encoder.encode(download)
+            
+            // Write to disk
+            try data.write(to: metadataPath)
+            print("Saved metadata for download: \(download.fileName) at \(metadataPath.path)")
+            
+            // Also organize the download in the appropriate folder
+            organizeDownloadByStatus(download)
+        } catch {
+            print("Error saving download metadata: \(error.localizedDescription)")
+        }
+    }
+    
+    private func organizeDownloadByStatus(_ download: DownloadFile) {
+        // Get the appropriate directory for this download's status
+        let targetDir: URL
+        switch download.status {
+        case .downloading:
+            targetDir = downloadingDir
+        case .paused:
+            targetDir = pausedDir
+        case .completed:
+            targetDir = completedDir
+        default:
+            return // Don't organize other statuses
+        }
+        
+        // Create a symlink if needed
+        let targetLink = targetDir.appendingPathComponent(download.fileName)
+        
+        // Check if the actual file exists in the downloads directory
+        let downloadsPath = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+        let filePath = downloadsPath.appendingPathComponent(download.fileName)
+        
+        if FileManager.default.fileExists(atPath: filePath.path) {
+            // Create symbolic link if it doesn't exist already
+            if !FileManager.default.fileExists(atPath: targetLink.path) {
+                do {
+                    try FileManager.default.createSymbolicLink(at: targetLink, withDestinationURL: filePath)
+                    print("Created symbolic link for \(download.fileName) in \(targetDir.lastPathComponent) directory")
+                } catch {
+                    print("Error creating symbolic link: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            print("File does not exist at expected path: \(filePath.path)")
+        }
     }
     
     deinit {

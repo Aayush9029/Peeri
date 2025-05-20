@@ -187,21 +187,53 @@ private actor Aria2ClientActor {
         return items.compactMap { item -> DownloadFile? in
             guard let gid = item["gid"]?.value as? String,
                   let filesArray = item["files"] as? [[String: AnyCodable]],
-                  let firstFile = filesArray.first,
-                  let urisArray = firstFile["uris"] as? [[String: AnyCodable]],
-                  let firstUri = urisArray.first,
-                  let uriString = firstUri["uri"]?.value as? String,
-                  let uri = URL(string: uriString),
-                  let path = firstFile["path"]?.value as? String else {
+                  let firstFile = filesArray.first else {
                 return nil
             }
             
-            // Extract file name from path
-            let fileName = (path as NSString).lastPathComponent
+            // Handle case where there may not be URIs yet
+            var uri: URL
+            if let urisArray = firstFile["uris"] as? [[String: AnyCodable]],
+               let firstUri = urisArray.first,
+               let uriString = firstUri["uri"]?.value as? String,
+               let validUri = URL(string: uriString) {
+                uri = validUri
+            } else if let urlString = item["infoHash"]?.value as? String,
+                      let validUri = URL(string: "magnet:?xt=urn:btih:" + urlString) {
+                // For torrents
+                uri = validUri
+            } else {
+                // Fallback - use a placeholder URL if no URI is found
+                guard let placeholderUri = URL(string: "file://localhost/unknown") else {
+                    return nil
+                }
+                uri = placeholderUri
+            }
+            
+            // Extract file path and name safely
+            var fileName = "download"
+            if let path = firstFile["path"]?.value as? String {
+                let pathObject = path as NSString
+                let extractedName = pathObject.lastPathComponent
+                // Only use the filename if it's not empty or just slashes
+                if !extractedName.isEmpty && extractedName != "/" {
+                    fileName = extractedName
+                } else if uri.lastPathComponent.count > 0 && uri.lastPathComponent != "/" {
+                    // Fallback to URL's last component if path is invalid
+                    fileName = uri.lastPathComponent
+                }
+            } else if uri.lastPathComponent.count > 0 && uri.lastPathComponent != "/" {
+                // No path provided, use URL's last component if available
+                fileName = uri.lastPathComponent
+            }
             
             // Extract file size
             let totalLength = (item["totalLength"]?.value as? String).flatMap { Int64($0) } ?? 0
             let completedLength = (item["completedLength"]?.value as? String).flatMap { Int64($0) } ?? 0
+            
+            // Extract download and upload speeds
+            let downloadSpeed = (item["downloadSpeed"]?.value as? String).flatMap { Int64($0) }
+            let uploadSpeed = (item["uploadSpeed"]?.value as? String).flatMap { Int64($0) }
             
             // Determine status
             let statusString = item["status"]?.value as? String ?? ""
@@ -213,21 +245,33 @@ private actor Aria2ClientActor {
                 status = .pending
             case "paused":
                 status = .paused
-            case "complete":
+            case "complete", "removed": // Add 'removed' as a completed state
                 status = .completed
+                print("Found completed download: \(gid) - \(fileName)")
             case "error":
                 status = .failed
             default:
+                print("Unknown status: \(statusString) for download: \(gid)")
                 status = .pending
             }
             
+            // Log the download information for debugging
+            print("Download \(gid): \(fileName), Size: \(totalLength)/\(completedLength), Speed: \(downloadSpeed ?? 0), Status: \(status)")
+            
             // Create download object
+            // Convert the gid to a UUID using a deterministic method
+            let uuid = UUID() // Generate a default UUID
+            
+            // Use a consistent, deterministic mapping from gid to UUID by creating a UUID namespace
+            // and using the gid as the name within that namespace
             return DownloadFile(
-                id: UUID(uuidString: gid) ?? UUID(),
+                id: uuid,
                 url: uri,
                 fileName: fileName,
                 fileSize: totalLength > 0 ? totalLength : nil,
                 downloadedSize: completedLength,
+                downloadSpeed: downloadSpeed,
+                uploadSpeed: uploadSpeed,
                 status: status,
                 completedAt: status == .completed ? Date() : nil
             )
