@@ -186,8 +186,7 @@ actor Aria2RPCClient {
             uploadSpeed: uploadSpeed,
             connections: connections,
             numSeeders: numSeeders,
-            status: downloadStatus,
-            completedAt: downloadStatus == .completed ? Date() : nil
+            status: downloadStatus
         )
     }
 

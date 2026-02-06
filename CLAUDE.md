@@ -27,11 +27,9 @@ There are no tests, no linter, and no CI configured.
 
 | Module | Purpose | Key dependencies |
 |---|---|---|
-| **Aria2Client** | JSON-RPC client for aria2 daemon. Uses `@DependencyClient` pattern (Point-Free). Wraps Alamofire HTTP calls in an actor (`Aria2ClientActor`) for thread safety. | Alamofire, AnyCodable, swift-dependencies |
+| **Aria2Kit** | JSON-RPC client for aria2 daemon. Uses `@DependencyClient` pattern (Point-Free). Wraps Alamofire HTTP calls in an actor (`Aria2ClientActor`) for thread safety. | Alamofire, AnyCodable, swift-dependencies |
 | **Models** | `DownloadFile` and `DownloadStatus` — the core data model shared across the app. | KeyboardShortcuts |
 | **Shared** | Re-exports Point-Free dependencies (Dependencies, Sharing, IdentifiedCollections). | swift-dependencies, swift-sharing, swift-identified-collections |
-| **ClipboardClient** | macOS clipboard operations via CGEvent simulation. Uses Sauce for keycode lookup. | Sauce, swift-dependencies |
-| **AnalyticsClient** | Stub analytics (logs via os_log, no external service). | swift-dependencies |
 | **Assets** | Color/image constants for theming. | — |
 | **UI** | Re-exports Assets. | Assets, Models, KeyboardShortcuts |
 
@@ -52,3 +50,7 @@ There are no tests, no linter, and no CI configured.
 ### Dependency injection
 
 All service clients follow the Point-Free `@DependencyClient` / `DependencyKey` pattern with a `liveValue` static property. To add a new client: define the struct with closure properties, conform to `DependencyKey`, provide `liveValue`, and register on `DependencyValues`.
+
+## Periphery / Dead Code
+
+When running Periphery, **skip Aria2Kit warnings**. Many Aria2Kit types and properties are decoded from aria2's JSON-RPC but not yet consumed by the app — they map the full aria2 API surface and will be used as features are built out.

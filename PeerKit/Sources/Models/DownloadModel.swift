@@ -17,8 +17,6 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var connections: Int?
     public var numSeeders: Int?
     public var status: DownloadStatus
-    public var createdAt: Date
-    public var completedAt: Date?
 
     public init(
         id: ID = .init(UUID()),
@@ -32,9 +30,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         uploadSpeed: Int64? = nil,
         connections: Int? = nil,
         numSeeders: Int? = nil,
-        status: DownloadStatus = .pending,
-        createdAt: Date = Date(),
-        completedAt: Date? = nil
+        status: DownloadStatus = .pending
     ) {
         self.id = id
         self.gid = gid
@@ -48,8 +44,6 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.connections = connections
         self.numSeeders = numSeeders
         self.status = status
-        self.createdAt = createdAt
-        self.completedAt = completedAt
     }
 
     public var progress: Double {

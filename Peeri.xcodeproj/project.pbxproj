@@ -7,10 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		5114449E2DD5508900FC3129 /* AnalyticsClient in Frameworks */ = {isa = PBXBuildFile; productRef = 5114449D2DD5508900FC3129 /* AnalyticsClient */; };
 		511444A02DD5508900FC3129 /* Aria2Kit in Frameworks */ = {isa = PBXBuildFile; productRef = 5114449F2DD5508900FC3129 /* Aria2Kit */; };
 		511444A22DD5508900FC3129 /* Assets in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A12DD5508900FC3129 /* Assets */; };
-		511444A42DD5508900FC3129 /* ClipboardClient in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A32DD5508900FC3129 /* ClipboardClient */; };
 		511444A62DD5508900FC3129 /* Models in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A52DD5508900FC3129 /* Models */; };
 		511444AA2DD5508900FC3129 /* UI in Frameworks */ = {isa = PBXBuildFile; productRef = 511444A92DD5508900FC3129 /* UI */; };
 		511444AC2DD550E300FC3129 /* Shared in Frameworks */ = {isa = PBXBuildFile; productRef = 511444AB2DD550E300FC3129 /* Shared */; };
@@ -35,11 +33,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				511444A62DD5508900FC3129 /* Models in Frameworks */,
-				5114449E2DD5508900FC3129 /* AnalyticsClient in Frameworks */,
 				511444AC2DD550E300FC3129 /* Shared in Frameworks */,
 				511444A22DD5508900FC3129 /* Assets in Frameworks */,
 				511444AA2DD5508900FC3129 /* UI in Frameworks */,
-				511444A42DD5508900FC3129 /* ClipboardClient in Frameworks */,
 				511444A02DD5508900FC3129 /* Aria2Kit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -354,10 +350,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		5114449D2DD5508900FC3129 /* AnalyticsClient */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = AnalyticsClient;
-		};
 		5114449F2DD5508900FC3129 /* Aria2Kit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Aria2Kit;
@@ -365,10 +357,6 @@
 		511444A12DD5508900FC3129 /* Assets */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Assets;
-		};
-		511444A32DD5508900FC3129 /* ClipboardClient */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ClipboardClient;
 		};
 		511444A52DD5508900FC3129 /* Models */ = {
 			isa = XCSwiftPackageProductDependency;

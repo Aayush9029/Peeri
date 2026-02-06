@@ -56,9 +56,11 @@ final class DownloadManager {
 
     nonisolated(unsafe) private var updateTimer: Timer?
     private let aria2Host = "localhost"
-    private let aria2Port: UInt16 = 6800
+    private let aria2Port: UInt16 = 16800
     private let aria2Token = "peeri"
     private let logger = Logger(subsystem: "com.lovedoingthings.peeri", category: "DownloadManager")
+
+    private var hasEverConnected = false
 
     init() {
         setupNotificationObservers()
@@ -95,7 +97,15 @@ final class DownloadManager {
     }
 
     private func attemptConnection(retryCount: Int, maxRetries: Int) {
-        let delay = min(Double(retryCount) * 1.0 + 2.0, 10.0)
+        // First few attempts are fast, then back off
+        let delay: Double
+        if retryCount == 0 {
+            delay = 0.2  // Try immediately first
+        } else if retryCount < 5 {
+            delay = Double(retryCount) * 0.3  // 0.3s, 0.6s, 0.9s, 1.2s, 1.5s
+        } else {
+            delay = min(Double(retryCount) * 0.5 + 2.0, 10.0)  // Cap at 10s
+        }
 
         guard retryCount <= maxRetries else {
             attemptConnection(retryCount: 0, maxRetries: maxRetries)
@@ -123,14 +133,19 @@ final class DownloadManager {
             logger.info("Connected to aria2 version: \(version)")
             connectionState = .connected
             lastError = nil
+            hasEverConnected = true
             return true
         } catch let timeoutError as TimeoutError {
-            connectionState = .failed(timeoutError)
-            lastError = "Connection timed out. Aria2 daemon may still be starting."
+            if hasEverConnected {
+                connectionState = .failed(timeoutError)
+                lastError = "Connection timed out. Aria2 daemon may still be starting."
+            }
             return false
         } catch {
-            connectionState = .failed(error)
-            lastError = "Failed to connect to aria2: \(error.localizedDescription)"
+            if hasEverConnected {
+                connectionState = .failed(error)
+                lastError = "Failed to connect to aria2: \(error.localizedDescription)"
+            }
             return false
         }
     }

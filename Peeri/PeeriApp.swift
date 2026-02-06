@@ -105,7 +105,7 @@ struct PeeriApp: App {
         # Enable JSON-RPC server
         enable-rpc=true
         rpc-listen-all=true
-        rpc-listen-port=6800
+        rpc-listen-port=16800
         rpc-secret=peeri
         
         # BitTorrent settings

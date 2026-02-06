@@ -129,29 +129,23 @@ struct ContentView: View {
 
     private var contentPanel: some View {
         VStack {
-            if let error = downloadManager.lastError,
-               case .failed = downloadManager.connectionState
-            {
-                ConnectionErrorView(errorMessage: error)
-            } else {
-                DownloadListView(
-                    downloads: filteredDownloads,
-                    downloadManager: downloadManager
-                )
-                Divider()
-                    .padding(.vertical)
-                TransferStatsView(
-                    downloadRate: downloadManager.totalDownloadRate,
-                    uploadRate: downloadManager.totalUploadRate,
-                    downloadHistory: downloadManager.downloadSpeedHistory,
-                    uploadHistory: downloadManager.uploadSpeedHistory,
-                    totalDownloaded: downloadManager.sessionDownloaded,
-                    totalUploaded: downloadManager.sessionUploaded,
-                    formatBytes: downloadManager.formatBytes
-                )
-                .frame(height: 320)
-                .padding()
-            }
+            DownloadListView(
+                downloads: filteredDownloads,
+                downloadManager: downloadManager
+            )
+            Divider()
+                .padding(.vertical)
+            TransferStatsView(
+                downloadRate: downloadManager.totalDownloadRate,
+                uploadRate: downloadManager.totalUploadRate,
+                downloadHistory: downloadManager.downloadSpeedHistory,
+                uploadHistory: downloadManager.uploadSpeedHistory,
+                totalDownloaded: downloadManager.sessionDownloaded,
+                totalUploaded: downloadManager.sessionUploaded,
+                formatBytes: downloadManager.formatBytes
+            )
+            .frame(height: 320)
+            .padding()
         }
     }
 }
