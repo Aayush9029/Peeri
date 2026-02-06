@@ -121,10 +121,6 @@ actor Aria2RPCClient {
         return try await call(.getGlobalStat)
     }
 
-    func getFiles(gid: String) async throws -> [Aria2FileInfo] {
-        return try await call(.getFiles, params: [.string(gid)])
-    }
-
     // MARK: - Download Processing
 
     func processStatus(_ status: Aria2StatusResponse) -> DownloadFile {
