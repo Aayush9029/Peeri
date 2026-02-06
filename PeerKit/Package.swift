@@ -21,6 +21,7 @@ extension Target.Dependency {
     static let swiftDependenciesMacros: Self = .product(name: "DependenciesMacros", package: "swift-dependencies")
     static let swiftSharing: Self = .product(name: "Sharing", package: "swift-sharing")
     static let identifiedCollections: Self = .product(name: "IdentifiedCollections", package: "swift-identified-collections")
+    static let swiftTagged: Self = .product(name: "Tagged", package: "swift-tagged")
     static let sauce: Self = .product(name: "Sauce", package: "Sauce")
     static let keyboardShortcuts: Self = .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts")
 }
@@ -28,7 +29,7 @@ extension Target.Dependency {
 let package = Package(
     name: "PeerKit",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         .library(name: "UI", targets: ["UI"]),
@@ -44,6 +45,7 @@ let package = Package(
         .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.1.1"),
         .package(url: "https://github.com/rurza/KeyboardShortcuts.git", branch: "main"),
         .package(url: "https://github.com/pointfreeco/swift-sharing.git", from: "2.7.4"),
+        .package(url: "https://github.com/pointfreeco/swift-tagged.git", from: "0.10.0"),
         .package(url: "https://github.com/Clipy/Sauce.git", from: "2.4.1")
     ],
     targets: [
@@ -62,7 +64,8 @@ let package = Package(
         .target(
             name: "Models",
             dependencies: [
-                .keyboardShortcuts
+                .keyboardShortcuts,
+                .swiftTagged
             ]
         ),
         .target(
@@ -71,7 +74,8 @@ let package = Package(
                 .identifiedCollections,
                 .swiftSharing,
                 .swiftDependencies,
-                .swiftDependenciesMacros
+                .swiftDependenciesMacros,
+                .swiftTagged
             ]
         ),
         .target(

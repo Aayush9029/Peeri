@@ -14,77 +14,56 @@ enum ConnectionState {
     case failed(Error)
 }
 
+// MARK: - Shared Keys
+
+extension SharedKey where Self == FileStorageKey<IdentifiedArrayOf<DownloadFile>>.Default {
+    static var downloads: Self {
+        Self[.fileStorage(
+            URL.documentsDirectory.appending(path: "peeri/downloads/downloads.json")
+        ), default: []]
+    }
+}
+
 @MainActor
-class DownloadManager: ObservableObject {
-    @Published var downloads: IdentifiedArrayOf<DownloadFile> = []
-    @Published var activeDownloads: IdentifiedArrayOf<DownloadFile> = []
-    @Published var pausedDownloads: IdentifiedArrayOf<DownloadFile> = []
-    @Published var completedDownloads: IdentifiedArrayOf<DownloadFile> = []
+@Observable
+final class DownloadManager {
+    @ObservationIgnored @Shared(.downloads) var downloads
 
-    @Published var totalDownloadRate: Int64 = 0
-    @Published var totalUploadRate: Int64 = 0
-    @Published var connectionState: ConnectionState = .disconnected
-    @Published var lastError: String?
+    var totalDownloadRate: Int64 = 0
+    var totalUploadRate: Int64 = 0
+    var connectionState: ConnectionState = .disconnected
+    var lastError: String?
 
-    @Published var downloadSpeedHistory: [Double] = Array(repeating: 0, count: 60)
-    @Published var uploadSpeedHistory: [Double] = Array(repeating: 0, count: 60)
-    @Published var sessionDownloaded: Int64 = 0
-    @Published var sessionUploaded: Int64 = 0
+    var downloadSpeedHistory: [Double] = Array(repeating: 0, count: 60)
+    var uploadSpeedHistory: [Double] = Array(repeating: 0, count: 60)
+    var sessionDownloaded: Int64 = 0
+    var sessionUploaded: Int64 = 0
 
-    @Dependency(\.aria2Client) var aria2Client
+    // Computed category views — no more manual array sync
+    var activeDownloads: [DownloadFile] {
+        downloads.filter { $0.status == .downloading }
+    }
 
-    private var updateTimer: Timer?
+    var pausedDownloads: [DownloadFile] {
+        downloads.filter { $0.status == .paused }
+    }
+
+    var completedDownloads: [DownloadFile] {
+        downloads.filter { $0.status == .completed }
+    }
+
+    @ObservationIgnored @Dependency(\.aria2Client) var aria2Client
+
+    nonisolated(unsafe) private var updateTimer: Timer?
     private let aria2Host = "localhost"
     private let aria2Port: UInt16 = 6800
     private let aria2Token = "peeri"
     private let logger = Logger(subsystem: "com.lovedoingthings.peeri", category: "DownloadManager")
 
-    // File system paths for tracking downloads
-    private let baseDownloadDir: URL
-    private let downloadingDir: URL
-    private let pausedDir: URL
-    private let completedDir: URL
-    private let metadataDir: URL
-
     init() {
-        let documentDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        baseDownloadDir = documentDir.appendingPathComponent("peeri/downloads", isDirectory: true)
-        downloadingDir = baseDownloadDir.appendingPathComponent("downloading", isDirectory: true)
-        pausedDir = baseDownloadDir.appendingPathComponent("paused", isDirectory: true)
-        completedDir = baseDownloadDir.appendingPathComponent("completed", isDirectory: true)
-        metadataDir = baseDownloadDir.appendingPathComponent("metadata", isDirectory: true)
-
-        createDirectoryStructure()
-        loadDownloadsFromFileSystem()
         setupNotificationObservers()
         initializeAria2Client()
         checkConnectionAndStartTimer()
-    }
-
-    private func createDirectoryStructure() {
-        for directory in [baseDownloadDir, downloadingDir, pausedDir, completedDir, metadataDir] {
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        }
-    }
-
-    private func loadDownloadsFromFileSystem() {
-        guard let metadataFiles = try? FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil) else { return }
-
-        for file in metadataFiles where file.pathExtension == "json" {
-            guard let data = try? Data(contentsOf: file),
-                  let download = try? JSONDecoder().decode(DownloadFile.self, from: data) else { continue }
-
-            downloads[id: download.id] = download
-
-            switch download.status {
-            case .downloading: activeDownloads[id: download.id] = download
-            case .paused: pausedDownloads[id: download.id] = download
-            case .completed: completedDownloads[id: download.id] = download
-            default: break
-            }
-        }
-
-        logger.info("Loaded \(self.downloads.count) downloads from file system")
     }
 
     private func setupNotificationObservers() {
@@ -204,14 +183,8 @@ class DownloadManager: ObservableObject {
             logger.info("Added download with GID: \(gid)")
 
             let newDownload = try await aria2Client.tellStatus(gid)
-            downloads[id: newDownload.id] = newDownload
+            $downloads.withLock { $0[id: newDownload.id] = newDownload }
 
-            switch newDownload.status {
-            case .completed: completedDownloads[id: newDownload.id] = newDownload
-            default: activeDownloads[id: newDownload.id] = newDownload
-            }
-
-            saveDownloadMetadata(newDownload)
             Task { await updateDownloads() }
         } catch {
             logger.error("Failed to add download: \(error.localizedDescription)")
@@ -238,17 +211,7 @@ class DownloadManager: ObservableObject {
             let success = try await aria2Client.pause(download.gid)
             guard success else { return }
 
-            // O(1) update via IdentifiedArray
-            downloads[id: download.id]?.status = .paused
-            if let updated = downloads[id: download.id] {
-                saveDownloadMetadata(updated)
-            }
-
-            activeDownloads.remove(id: download.id)
-            var paused = download
-            paused.status = .paused
-            pausedDownloads[id: download.id] = paused
-
+            $downloads.withLock { $0[id: download.id]?.status = .paused }
             logger.info("Download paused: \(download.fileName)")
         } catch {
             logger.error("Failed to pause download: \(error.localizedDescription)")
@@ -261,16 +224,7 @@ class DownloadManager: ObservableObject {
             let success = try await aria2Client.unpause(download.gid)
             guard success else { return }
 
-            downloads[id: download.id]?.status = .downloading
-            if let updated = downloads[id: download.id] {
-                saveDownloadMetadata(updated)
-            }
-
-            pausedDownloads.remove(id: download.id)
-            var resumed = download
-            resumed.status = .downloading
-            activeDownloads[id: download.id] = resumed
-
+            $downloads.withLock { $0[id: download.id]?.status = .downloading }
             logger.info("Download resumed: \(download.fileName)")
         } catch {
             logger.error("Failed to resume download: \(error.localizedDescription)")
@@ -283,29 +237,17 @@ class DownloadManager: ObservableObject {
             let success = try await aria2Client.remove(download.gid)
             guard success else { return }
 
-            // Remove metadata file
-            let metadataPath = metadataDir.appendingPathComponent("\(download.id.uuidString).json")
-            try? FileManager.default.removeItem(at: metadataPath)
-
-            // Remove symlinks
-            for directory in [downloadingDir, pausedDir, completedDir] {
-                let linkPath = directory.appendingPathComponent(download.fileName)
-                if FileManager.default.fileExists(atPath: linkPath.path) {
-                    try? FileManager.default.removeItem(at: linkPath)
-                }
-            }
-
-            // O(1) removal from all identified arrays
-            downloads.remove(id: download.id)
-            activeDownloads.remove(id: download.id)
-            pausedDownloads.remove(id: download.id)
-            completedDownloads.remove(id: download.id)
-
+            $downloads.withLock { $0.remove(id: download.id) }
             logger.info("Download canceled: \(download.fileName)")
         } catch {
             logger.error("Failed to cancel download: \(error.localizedDescription)")
             lastError = "Failed to cancel download: \(error.localizedDescription)"
         }
+    }
+
+    func removeDownload(_ download: DownloadFile) {
+        $downloads.withLock { $0.remove(id: download.id) }
+        logger.info("Download removed from list: \(download.fileName)")
     }
 
     func showInFinder(_ download: DownloadFile) {
@@ -324,8 +266,6 @@ class DownloadManager: ObservableObject {
 
     private func updateDownloads() async {
         do {
-            await updateDownloadsFromFileSystem()
-
             guard case .connected = connectionState else {
                 if case .failed = connectionState {
                     _ = await verifyConnection()
@@ -333,7 +273,6 @@ class DownloadManager: ObservableObject {
                 return
             }
 
-            // Aria2Kit returns [DownloadFile] directly
             let activeFiles = try await aria2Client.tellActive()
             let waitingFiles = try await aria2Client.tellWaiting(0, 30)
             let stoppedFiles = try await aria2Client.tellStopped(0, 100)
@@ -353,35 +292,6 @@ class DownloadManager: ObservableObject {
         }
     }
 
-    private func updateDownloadsFromFileSystem() async {
-        guard let metadataFiles = try? FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: nil) else { return }
-
-        var newDownloads: IdentifiedArrayOf<DownloadFile> = []
-        var newActive: IdentifiedArrayOf<DownloadFile> = []
-        var newPaused: IdentifiedArrayOf<DownloadFile> = []
-        var newCompleted: IdentifiedArrayOf<DownloadFile> = []
-
-        for file in metadataFiles where file.pathExtension == "json" {
-            guard let data = try? Data(contentsOf: file),
-                  let download = try? JSONDecoder().decode(DownloadFile.self, from: data) else { continue }
-
-            newDownloads[id: download.id] = download
-            switch download.status {
-            case .downloading: newActive[id: download.id] = download
-            case .paused: newPaused[id: download.id] = download
-            case .completed: newCompleted[id: download.id] = download
-            default: break
-            }
-        }
-
-        if !newDownloads.isEmpty && newDownloads.count != downloads.count {
-            downloads = newDownloads
-            activeDownloads = newActive
-            pausedDownloads = newPaused
-            completedDownloads = newCompleted
-        }
-    }
-
     private func updateStatistics(_ activeFiles: [DownloadFile]) {
         var dlRate: Int64 = 0
         var ulRate: Int64 = 0
@@ -393,7 +303,6 @@ class DownloadManager: ObservableObject {
         totalDownloadRate = dlRate
         totalUploadRate = ulRate
 
-        // Rolling 60-sample speed history
         downloadSpeedHistory.append(Double(dlRate))
         uploadSpeedHistory.append(Double(ulRate))
         if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
@@ -408,53 +317,7 @@ class DownloadManager: ObservableObject {
 
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
         let allNew = active + waiting + stopped
-
-        // Save new/changed downloads to filesystem
-        for download in allNew {
-            let existing = downloads[id: download.id]
-            if existing == nil || existing?.status != download.status || existing?.downloadedSize != download.downloadedSize {
-                saveDownloadMetadata(download)
-            }
-        }
-
-        // Rebuild identified arrays
-        downloads = IdentifiedArray(uniqueElements: allNew)
-        activeDownloads = IdentifiedArray(uniqueElements: active)
-        pausedDownloads = IdentifiedArray(uniqueElements: (waiting + active).filter { $0.status == .paused })
-        completedDownloads = IdentifiedArray(uniqueElements: stopped.filter { $0.status == .completed })
-    }
-
-    // MARK: - Persistence
-
-    private func saveDownloadMetadata(_ download: DownloadFile) {
-        let metadataPath = metadataDir.appendingPathComponent("\(download.id.uuidString).json")
-        do {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .prettyPrinted
-            try encoder.encode(download).write(to: metadataPath)
-            organizeDownloadByStatus(download)
-        } catch {
-            logger.error("Error saving metadata: \(error.localizedDescription)")
-        }
-    }
-
-    private func organizeDownloadByStatus(_ download: DownloadFile) {
-        let targetDir: URL
-        switch download.status {
-        case .downloading: targetDir = downloadingDir
-        case .paused: targetDir = pausedDir
-        case .completed: targetDir = completedDir
-        default: return
-        }
-
-        let targetLink = targetDir.appendingPathComponent(download.fileName)
-        let downloadsPath = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-        let filePath = downloadsPath.appendingPathComponent(download.fileName)
-
-        if FileManager.default.fileExists(atPath: filePath.path),
-           !FileManager.default.fileExists(atPath: targetLink.path) {
-            try? FileManager.default.createSymbolicLink(at: targetLink, withDestinationURL: filePath)
-        }
+        $downloads.withLock { $0 = IdentifiedArray(uniqueElements: allNew) }
     }
 
     // MARK: - Helpers
@@ -471,6 +334,7 @@ class DownloadManager: ObservableObject {
     }
 
     deinit {
-        updateTimer?.invalidate()
+        let timer = updateTimer
+        timer?.invalidate()
     }
 }

@@ -1,10 +1,3 @@
-//
-//  SideBar.swift
-//  Peeri
-//
-//  Created by Aayush Pokharel on 2023-05-09.
-//
-
 import Models
 import Shared
 import SwiftUI
@@ -45,16 +38,7 @@ struct SideBar: View {
     let activeCount: Int
     let pausedCount: Int
     let completedCount: Int
-    let connectionState: ConnectionState
-    
-    init(selectedFilter: Binding<DownloadFilter>, activeCount: Int = 0, pausedCount: Int = 0, completedCount: Int = 0, connectionState: ConnectionState = .disconnected) {
-        self._selectedFilter = selectedFilter
-        self.activeCount = activeCount
-        self.pausedCount = pausedCount
-        self.completedCount = completedCount
-        self.connectionState = connectionState
-    }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Downloads")
@@ -73,15 +57,11 @@ struct SideBar: View {
                     selectedFilter = filter
                 }
             }
-            
+
             Spacer()
-            
-            // Connection status indicator
-            ConnectionStatusView(state: connectionState)
-                .padding(.top, 8)
         }
     }
-    
+
     private func getCount(for filter: DownloadFilter) -> Int {
         switch filter {
         case .all:
@@ -92,57 +72,6 @@ struct SideBar: View {
             return pausedCount
         case .completed:
             return completedCount
-        }
-    }
-}
-
-struct ConnectionStatusView: View {
-    let state: ConnectionState
-    
-    var body: some View {
-        HStack {
-            Circle()
-                .frame(width: 8, height: 8)
-                .foregroundColor(stateColor)
-            
-            Text(stateText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            
-            Spacer()
-        }
-        .padding(8)
-        .background(.gray.opacity(0.05))
-        .cornerRadius(8)
-    }
-    
-    private var stateColor: Color {
-        switch state {
-        case .connected:
-            return .green
-        case .connecting:
-            return .orange
-        case .disconnected:
-            return .red
-        case .failed:
-            return .red
-        @unknown default:
-            return .gray
-        }
-    }
-    
-    private var stateText: String {
-        switch state {
-        case .connected:
-            return "Connected"
-        case .connecting:
-            return "Connecting..."
-        case .disconnected:
-            return "Disconnected"
-        case .failed(let error):
-            return "Error: \(error.localizedDescription)"
-        @unknown default:
-            return "Unknown State"
         }
     }
 }
@@ -185,12 +114,16 @@ struct SideBarRow: View {
     }
 }
 
-struct SideBar_Previews: PreviewProvider {
-    static var previews: some View {
-        SideBar(selectedFilter: .constant(.all))
-            .padding()
-            .background(.black)
-            .cornerRadius(18)
-            .padding()
-    }
+#Preview {
+    SideBar(
+        selectedFilter: .constant(.all),
+        activeCount: 3,
+        pausedCount: 1,
+        completedCount: 5
+    )
+    .padding()
+    .frame(width: 240)
+    .background(.black)
+    .cornerRadius(18)
+    .padding()
 }

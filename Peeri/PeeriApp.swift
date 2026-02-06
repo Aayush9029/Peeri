@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct PeeriApp: App {
-    @StateObject private var downloadManager = DownloadManager()
+    @State private var downloadManager = DownloadManager()
     
     init() {
         startAria2Daemon()
@@ -232,7 +232,7 @@ struct PeeriApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(downloadManager)
+                .environment(downloadManager)
         }
         .windowStyle(.hiddenTitleBar)
         .commands {

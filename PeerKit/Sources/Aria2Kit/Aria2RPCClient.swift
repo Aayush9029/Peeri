@@ -176,7 +176,7 @@ actor Aria2RPCClient {
         }
 
         return DownloadFile(
-            id: UUID.deterministic(from: gid),
+            id: .deterministic(from: gid),
             gid: gid,
             url: uri,
             fileName: fileName,

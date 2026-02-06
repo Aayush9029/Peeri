@@ -1,18 +1,20 @@
-//
-//  TransferView.swift
-//  Peeri
-//
-//  Created by Aayush Pokharel on 2023-05-09.
-//
 import Charts
 import SwiftUI
 
-struct TransferView: View {
+struct TransferStatsView: View {
+    let downloadRate: Int64
+    let uploadRate: Int64
+    let downloadHistory: [Double]
+    let uploadHistory: [Double]
+    let totalDownloaded: Int64
+    let totalUploaded: Int64
+    let formatBytes: (Int64) -> String
+
     var body: some View {
         HStack {
             ZStack {
-                TransferChart(numbers: [0.35, 0.18, 0.2], tint: .teal)
-                TransferChart(numbers: [0.05, 0.08, 0.23], tint: .green)
+                TransferChart(numbers: normalizedHistory(downloadHistory), tint: .blue)
+                TransferChart(numbers: normalizedHistory(uploadHistory), tint: .green)
             }
             VStack(alignment: .leading) {
                 Text("DOWNLOAD / UPLOAD PER SEC")
@@ -22,12 +24,12 @@ struct TransferView: View {
                 HStack {
                     HStack {
                         Image(systemName: "arrow.down")
-                        Text("14.0MB")
+                        Text(formattedDownloadRate)
                     }
                     Spacer()
                     HStack {
                         Image(systemName: "arrow.up")
-                        Text("11.5MB")
+                        Text(formattedUploadRate)
                     }
                 }
                 .font(.title.bold())
@@ -35,53 +37,39 @@ struct TransferView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 32) {
                         VStack(alignment: .leading) {
-                            Text("Seeds")
+                            Text("Total Downloaded")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("12")
+                            Text(formatBytes(totalDownloaded))
                         }
 
                         VStack(alignment: .leading) {
-                            Text("Downloaded")
+                            Text("Total Uploaded")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("800 MB")
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Time elapsed")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("8 min 41 sec")
+                            Text(formatBytes(totalUploaded))
                         }
                     }
                     Spacer()
-                    VStack(alignment: .leading, spacing: 32) {
-                        VStack(alignment: .leading) {
-                            Text("Down / up ratio")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("1.2")
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Uploaded")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("228 MB")
-                        }
-                        VStack(alignment: .leading) {
-                            Text("Time left")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("1 min 12 sec")
-                        }
-                    }
                 }
                 .font(.title2)
                 Spacer()
             }.padding()
         }
+    }
+
+    private func normalizedHistory(_ history: [Double]) -> [Double] {
+        let maxVal = history.max() ?? 1
+        guard maxVal > 0 else { return history.map { _ in 0.0 } }
+        return history.map { $0 / maxVal }
+    }
+
+    private var formattedDownloadRate: String {
+        ByteCountFormatter.string(fromByteCount: downloadRate, countStyle: .binary) + "/s"
+    }
+
+    private var formattedUploadRate: String {
+        ByteCountFormatter.string(fromByteCount: uploadRate, countStyle: .binary) + "/s"
     }
 }
 
@@ -94,7 +82,6 @@ struct TransferChart: View {
             ZStack {
                 Chart {
                     ForEach(Array(numbers.enumerated()), id: \.offset) { index, value in
-
                         LineMark(
                             x: .value("Index", index),
                             y: .value("Value", value)
@@ -121,7 +108,6 @@ struct TransferChart: View {
 
                 Chart {
                     ForEach(Array(numbers.enumerated()), id: \.offset) { index, value in
-
                         LineMark(
                             x: .value("Index", index),
                             y: .value("Value", value)
@@ -149,15 +135,5 @@ struct TransferChart: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(LinearGradient(colors: [.clear, .gray.opacity(0.125)], startPoint: .leading, endPoint: .trailing), lineWidth: 2)
         )
-    }
-}
-
-struct TransferView_Previews: PreviewProvider {
-    static var previews: some View {
-        TransferView()
-            .padding()
-            .background(.black)
-            .cornerRadius(18)
-            .padding()
     }
 }

@@ -2,3 +2,4 @@
 @_exported import DependenciesMacros
 @_exported import IdentifiedCollections
 @_exported import Sharing
+@_exported import Tagged

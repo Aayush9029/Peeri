@@ -1,8 +1,11 @@
 import Foundation
 import KeyboardShortcuts
+import Tagged
 
 public struct DownloadFile: Identifiable, Codable, Hashable {
-    public var id: UUID
+    public typealias ID = Tagged<DownloadFile, UUID>
+
+    public var id: ID
     public var gid: String
     public var url: URL
     public var fileName: String
@@ -16,7 +19,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var completedAt: Date?
 
     public init(
-        id: UUID = UUID(),
+        id: ID = .init(UUID()),
         gid: String = "",
         url: URL,
         fileName: String,
@@ -57,15 +60,15 @@ public enum DownloadStatus: String, Codable {
     case failed
 }
 
-// MARK: - Deterministic UUID from GID
+// MARK: - Deterministic ID from GID
 
-public extension UUID {
-    /// Creates a deterministic UUID from an aria2 GID string (16-char hex).
-    /// The same GID always produces the same UUID.
-    static func deterministic(from name: String) -> UUID {
+public extension DownloadFile.ID {
+    /// Creates a deterministic DownloadFile.ID from an aria2 GID string (16-char hex).
+    /// The same GID always produces the same ID.
+    static func deterministic(from name: String) -> DownloadFile.ID {
         let padded = name.padding(toLength: 32, withPad: "0", startingAt: 0)
         let s = padded
         let formatted = "\(s.prefix(8))-\(s.dropFirst(8).prefix(4))-\(s.dropFirst(12).prefix(4))-\(s.dropFirst(16).prefix(4))-\(s.dropFirst(20).prefix(12))"
-        return UUID(uuidString: formatted) ?? UUID()
+        return DownloadFile.ID(UUID(uuidString: formatted) ?? UUID())
     }
 }
