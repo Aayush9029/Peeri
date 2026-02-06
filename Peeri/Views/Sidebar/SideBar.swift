@@ -3,7 +3,7 @@ import Shared
 import SwiftUI
 
 enum DownloadFilter: String, CaseIterable, Identifiable {
-    case all = "All"
+    case all = "Overview"
     case downloading = "Downloading"
     case paused = "Paused"
     case completed = "Completed"
@@ -40,10 +40,12 @@ struct SideBar: View {
     let completedCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Downloads")
+        VStack(alignment: .leading, spacing: 4) {
+            Text("OVERVIEW")
+                .font(.caption)
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
+                .padding(.leading, 8)
+                .padding(.bottom, 2)
 
             ForEach(DownloadFilter.allCases) { filter in
                 SideBarRow(
@@ -90,27 +92,31 @@ struct SideBarRow: View {
     }
 
     var body: some View {
-        VStack {
-            HStack {
-                Image(systemName: "\(icon)")
-                    .imageScale(.medium)
-                    .frame(width: 18, height: 18)
-                Text(name)
-                Spacer()
-                Text("\(count)")
-                    .foregroundColor(selected ? .teal : .secondary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.gray.opacity(selected ? 0 : 0.125))
-                    .cornerRadius(8)
-            }
-            .font(.title3)
-            .padding(6)
+        HStack {
+            Image(systemName: icon)
+                .imageScale(.medium)
+                .frame(width: 18, height: 18)
+            Text(name)
+            Spacer()
+            Text("\(count)")
+                .font(.callout)
+                .foregroundStyle(selected ? .white : .secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(selected ? Color.accentColor.opacity(0.8) : Color.gray.opacity(0.15))
+                )
         }
+        .font(.callout)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .opacity(selected ? 1 : 0.75)
-        .bold(selected)
-        .background(.gray.opacity(selected ? 0.125 : 0))
-        .cornerRadius(16)
+        .fontWeight(selected ? .semibold : .regular)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(selected ? Color.gray.opacity(0.12) : Color.clear)
+        )
     }
 }
 

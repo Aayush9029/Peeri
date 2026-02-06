@@ -14,6 +14,8 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var downloadedSize: Int64
     public var downloadSpeed: Int64?
     public var uploadSpeed: Int64?
+    public var connections: Int?
+    public var numSeeders: Int?
     public var status: DownloadStatus
     public var createdAt: Date
     public var completedAt: Date?
@@ -28,6 +30,8 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         downloadedSize: Int64 = 0,
         downloadSpeed: Int64? = nil,
         uploadSpeed: Int64? = nil,
+        connections: Int? = nil,
+        numSeeders: Int? = nil,
         status: DownloadStatus = .pending,
         createdAt: Date = Date(),
         completedAt: Date? = nil
@@ -41,6 +45,8 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.downloadedSize = downloadedSize
         self.downloadSpeed = downloadSpeed
         self.uploadSpeed = uploadSpeed
+        self.connections = connections
+        self.numSeeders = numSeeders
         self.status = status
         self.createdAt = createdAt
         self.completedAt = completedAt
@@ -49,6 +55,20 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var progress: Double {
         guard let fileSize = fileSize, fileSize > 0 else { return 0 }
         return Double(downloadedSize) / Double(fileSize)
+    }
+
+    /// Whether this is a torrent (has seeders info)
+    public var isTorrent: Bool {
+        numSeeders != nil
+    }
+
+    /// Estimated time remaining in seconds, nil if unknown
+    public var eta: TimeInterval? {
+        guard let speed = downloadSpeed, speed > 0,
+              let fileSize = fileSize, fileSize > 0 else { return nil }
+        let remaining = fileSize - downloadedSize
+        guard remaining > 0 else { return nil }
+        return TimeInterval(remaining) / TimeInterval(speed)
     }
 }
 

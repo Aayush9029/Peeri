@@ -171,6 +171,9 @@ actor Aria2RPCClient {
         default: downloadStatus = .pending
         }
 
+        let connections = status.connections.flatMap { Int($0) }
+        let numSeeders = status.numSeeders.flatMap { Int($0) }
+
         return DownloadFile(
             id: .deterministic(from: gid),
             gid: gid,
@@ -181,6 +184,8 @@ actor Aria2RPCClient {
             downloadedSize: completedLength,
             downloadSpeed: downloadSpeed,
             uploadSpeed: uploadSpeed,
+            connections: connections,
+            numSeeders: numSeeders,
             status: downloadStatus,
             completedAt: downloadStatus == .completed ? Date() : nil
         )
