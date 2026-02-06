@@ -8,13 +8,23 @@ struct TransferStatsView: View {
     let uploadHistory: [Double]
     let totalDownloaded: Int64
     let totalUploaded: Int64
+    var allPaused: Bool = false
+
+    private var hasUploadActivity: Bool {
+        uploadHistory.contains(where: { $0 > 0 })
+    }
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             ZStack {
-                TransferChart(numbers: normalizedHistory(downloadHistory), tint: .blue)
-                TransferChart(numbers: normalizedHistory(uploadHistory), tint: .green)
+                TransferChart(numbers: downloadHistory, tint: .blue)
+                if hasUploadActivity {
+                    TransferChart(numbers: uploadHistory, tint: .green)
+                }
             }
+            .saturation(allPaused ? 0 : 1)
+            .opacity(allPaused ? 0.5 : 1)
+
             VStack(alignment: .leading) {
                 Text("DOWNLOAD / UPLOAD PER SEC")
                     .font(.callout)
@@ -33,34 +43,25 @@ struct TransferStatsView: View {
                 }
                 .font(.title.bold())
                 Spacer()
-                HStack {
-                    VStack(alignment: .leading, spacing: 32) {
-                        VStack(alignment: .leading) {
-                            Text("Total Downloaded")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(ByteCountFormatter.string(fromByteCount: totalDownloaded, countStyle: .binary))
-                        }
-
-                        VStack(alignment: .leading) {
-                            Text("Total Uploaded")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(ByteCountFormatter.string(fromByteCount: totalUploaded, countStyle: .binary))
-                        }
+                VStack(alignment: .leading, spacing: 32) {
+                    VStack(alignment: .leading) {
+                        Text("Total Downloaded")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(ByteCountFormatter.string(fromByteCount: totalDownloaded, countStyle: .binary))
                     }
-                    Spacer()
+
+                    VStack(alignment: .leading) {
+                        Text("Total Uploaded")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(ByteCountFormatter.string(fromByteCount: totalUploaded, countStyle: .binary))
+                    }
                 }
                 .font(.title2)
                 Spacer()
             }.padding()
         }
-    }
-
-    private func normalizedHistory(_ history: [Double]) -> [Double] {
-        let maxVal = history.max() ?? 1
-        guard maxVal > 0 else { return history.map { _ in 0.0 } }
-        return history.map { $0 / maxVal }
     }
 
     private var formattedDownloadRate: String {
@@ -76,6 +77,10 @@ struct TransferChart: View {
     let numbers: [Double]
     let tint: Color
 
+    private var maxValue: Double {
+        max(numbers.max() ?? 0, 1024) * 1.25
+    }
+
     var body: some View {
         VStack {
             ZStack {
@@ -85,7 +90,7 @@ struct TransferChart: View {
                             x: .value("Index", index),
                             y: .value("Value", value)
                         )
-                        .interpolationMethod(.cardinal)
+                        .interpolationMethod(.catmullRom)
                         .foregroundStyle(tint)
                         .lineStyle(.init(lineWidth: 6))
 
@@ -104,6 +109,7 @@ struct TransferChart: View {
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
+                .chartYScale(domain: 0...maxValue)
 
                 Chart {
                     ForEach(Array(numbers.enumerated()), id: \.offset) { index, value in
@@ -111,7 +117,7 @@ struct TransferChart: View {
                             x: .value("Index", index),
                             y: .value("Value", value)
                         )
-                        .interpolationMethod(.cardinal)
+                        .interpolationMethod(.catmullRom)
                         .foregroundStyle(tint)
 
                         if index == (numbers.count - 1) {
@@ -126,6 +132,7 @@ struct TransferChart: View {
                 }
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
+                .chartYScale(domain: 0...maxValue)
                 .saturation(1.25)
             }
         }

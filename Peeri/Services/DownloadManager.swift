@@ -306,10 +306,15 @@ final class DownloadManager {
         totalDownloadRate = dlRate
         totalUploadRate = ulRate
 
-        downloadSpeedHistory.append(Double(dlRate))
-        uploadSpeedHistory.append(Double(ulRate))
-        if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
-        if uploadSpeedHistory.count > 60 { uploadSpeedHistory.removeFirst() }
+        let hasActivity = dlRate > 0 || ulRate > 0
+            || activeFiles.contains(where: { $0.status == .downloading || $0.status == .seeding })
+
+        if hasActivity {
+            downloadSpeedHistory.append(Double(dlRate))
+            uploadSpeedHistory.append(Double(ulRate))
+            if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
+            if uploadSpeedHistory.count > 60 { uploadSpeedHistory.removeFirst() }
+        }
     }
 
     private func updateGlobalStats() async {

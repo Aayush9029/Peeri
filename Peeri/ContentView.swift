@@ -8,9 +8,15 @@ struct ContentView: View {
     @State private var showAddDownload = false
     @State private var selectedFilter: DownloadFilter = .all
     @State private var sidebarCollapsed = false
+    @State private var statsCollapsed = false
 
     private var filteredDownloads: [DownloadFile] {
         selectedFilter.filter(downloadManager.downloads)
+    }
+
+    private var allPaused: Bool {
+        let active = downloadManager.downloads.filter { $0.status == .downloading || $0.status == .seeding }
+        return active.isEmpty && !downloadManager.downloads.isEmpty
     }
 
     var body: some View {
@@ -30,7 +36,12 @@ struct ContentView: View {
                 }
 
                 // Content area
-                contentPanel
+                ZStack(alignment: .bottomTrailing) {
+                    contentPanel
+                    floatingAddButton
+                        .padding(.trailing, 24)
+                        .padding(.bottom, statsCollapsed ? 56 : 24)
+                }
             }
             .animation(.easeInOut(duration: 0.25), value: sidebarCollapsed)
         }
@@ -64,19 +75,22 @@ struct ContentView: View {
             connectionDot
 
             Spacer()
-
-            Button {
-                showAddDownload.toggle()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("Add Download")
-                }
-                .font(.callout)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
         }
+    }
+
+    // MARK: - Floating Add Button
+
+    private var floatingAddButton: some View {
+        Button { showAddDownload.toggle() } label: {
+            Image(systemName: "plus")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(.black)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Connection Dot
@@ -126,20 +140,64 @@ struct ContentView: View {
     // MARK: - Content Panel
 
     private var contentPanel: some View {
-        VStack {
+        VStack(spacing: 0) {
             DownloadListView(downloads: filteredDownloads)
-            Divider()
-                .padding(.vertical)
-            TransferStatsView(
-                downloadRate: downloadManager.totalDownloadRate,
-                uploadRate: downloadManager.totalUploadRate,
-                downloadHistory: downloadManager.downloadSpeedHistory,
-                uploadHistory: downloadManager.uploadSpeedHistory,
-                totalDownloaded: downloadManager.sessionDownloaded,
-                totalUploaded: downloadManager.sessionUploaded
-            )
-            .frame(height: 320)
-            .padding()
+
+            // Divider with toggle button
+            ZStack {
+                Divider()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        statsCollapsed.toggle()
+                    }
+                } label: {
+                    Image(systemName: statsCollapsed ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 16)
+                        .background(.bar)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.vertical, 4)
+
+            if statsCollapsed {
+                // Compact inline stats bar
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                        Text(ByteCountFormatter.string(fromByteCount: downloadManager.totalDownloadRate, countStyle: .binary) + "/s")
+                            .font(.callout.monospacedDigit())
+                    }
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                        Text(ByteCountFormatter.string(fromByteCount: downloadManager.totalUploadRate, countStyle: .binary) + "/s")
+                            .font(.callout.monospacedDigit())
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 32)
+                .transition(.opacity)
+            } else {
+                TransferStatsView(
+                    downloadRate: downloadManager.totalDownloadRate,
+                    uploadRate: downloadManager.totalUploadRate,
+                    downloadHistory: downloadManager.downloadSpeedHistory,
+                    uploadHistory: downloadManager.uploadSpeedHistory,
+                    totalDownloaded: downloadManager.sessionDownloaded,
+                    totalUploaded: downloadManager.sessionUploaded,
+                    allPaused: allPaused
+                )
+                .frame(height: 320)
+                .padding()
+                .transition(.opacity)
+            }
         }
     }
 }

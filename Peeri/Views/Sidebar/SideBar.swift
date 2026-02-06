@@ -47,7 +47,7 @@ struct SideBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("FILTERS")
+            Text("OVERVIEW")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8)
@@ -55,17 +55,15 @@ struct SideBar: View {
 
             ForEach(DownloadFilter.allCases) { filter in
                 let count = filter.filter(downloads).count
-                if filter == .all || count > 0 {
-                    SideBarRow(
-                        filter.rawValue,
-                        icon: filter.icon,
-                        count: count,
-                        selected: selectedFilter == filter
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedFilter = filter
-                    }
+                SideBarRow(
+                    filter.rawValue,
+                    icon: filter.icon,
+                    count: count,
+                    selected: selectedFilter == filter
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedFilter = filter
                 }
             }
 
@@ -96,23 +94,20 @@ struct SideBarRow: View {
             Spacer()
             Text("\(count)")
                 .font(.callout)
-                .foregroundStyle(selected ? .white : .secondary)
+                .foregroundStyle(selected ? .blue : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(
-                    Capsule()
-                        .fill(selected ? Color.accentColor.opacity(0.8) : Color.gray.opacity(0.15))
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.15))
                 )
         }
         .font(.callout)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .foregroundStyle(selected ? .blue : .primary)
         .opacity(selected ? 1 : 0.75)
         .fontWeight(selected ? .semibold : .regular)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(selected ? Color.gray.opacity(0.12) : Color.clear)
-        )
     }
 }
 
