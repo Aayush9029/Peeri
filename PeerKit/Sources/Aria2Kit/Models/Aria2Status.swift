@@ -17,6 +17,24 @@ public struct Aria2StatusResponse: Decodable, Sendable {
     public let dir: String?
     public let errorCode: String?
     public let errorMessage: String?
+    /// Total uploaded bytes
+    public let uploadLength: String?
+    /// Hex piece availability map
+    public let bitfield: String?
+    /// "true" if local is seeder (BT only)
+    public let seeder: String?
+    /// GIDs generated from this download
+    public let followedBy: [String]?
+    /// Parent download GID
+    public let following: String?
+    /// Parent download GID (multi-file)
+    public let belongsTo: String?
+    /// Verified bytes during hash check
+    public let verifiedLength: String?
+    /// "true" if awaiting hash check
+    public let verifyIntegrityPending: String?
+    /// BitTorrent metadata sub-object
+    public let bittorrent: Aria2BitTorrentInfo?
 }
 
 public struct Aria2FileInfo: Decodable, Sendable {

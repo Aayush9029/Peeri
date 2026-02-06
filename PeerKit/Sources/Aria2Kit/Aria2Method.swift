@@ -32,4 +32,7 @@ public enum Aria2Method: String, Encodable {
     case forceShutdown = "aria2.forceShutdown"
     case getGlobalStat = "aria2.getGlobalStat"
     case saveSession = "aria2.saveSession"
+    case systemMulticall = "system.multicall"
+    case systemListMethods = "system.listMethods"
+    case systemListNotifications = "system.listNotifications"
 }

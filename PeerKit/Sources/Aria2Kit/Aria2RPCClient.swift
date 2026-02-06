@@ -121,6 +121,120 @@ actor Aria2RPCClient {
         return try await call(.getGlobalStat)
     }
 
+    // MARK: - Force Variants
+
+    func forceRemove(gid: String) async throws -> String {
+        return try await call(.forceRemove, params: [.string(gid)])
+    }
+
+    func forcePause(gid: String) async throws -> String {
+        return try await call(.forcePause, params: [.string(gid)])
+    }
+
+    func forcePauseAll() async throws -> String {
+        return try await call(.forcePauseAll)
+    }
+
+    // MARK: - Batch Operations
+
+    func pauseAll() async throws -> String {
+        return try await call(.pauseAll)
+    }
+
+    func unpauseAll() async throws -> String {
+        return try await call(.unpauseAll)
+    }
+
+    // MARK: - Query Methods
+
+    func getPeers(gid: String) async throws -> [Aria2PeerInfo] {
+        return try await call(.getPeers, params: [.string(gid)])
+    }
+
+    func getServers(gid: String) async throws -> [Aria2ServerGroup] {
+        return try await call(.getServers, params: [.string(gid)])
+    }
+
+    func getFiles(gid: String) async throws -> [Aria2FileInfo] {
+        return try await call(.getFiles, params: [.string(gid)])
+    }
+
+    func getUris(gid: String) async throws -> [Aria2UriInfo] {
+        return try await call(.getUris, params: [.string(gid)])
+    }
+
+    // MARK: - Options
+
+    func getOption(gid: String) async throws -> [String: String] {
+        return try await call(.getOption, params: [.string(gid)])
+    }
+
+    func changeOption(gid: String, options: [String: String]) async throws -> String {
+        let optionsJSON = AnyJSON.dictionary(options.mapValues { AnyJSON.string($0) })
+        return try await call(.changeOption, params: [.string(gid), optionsJSON])
+    }
+
+    func getGlobalOption() async throws -> [String: String] {
+        return try await call(.getGlobalOption)
+    }
+
+    func changeGlobalOption(options: [String: String]) async throws -> String {
+        let optionsJSON = AnyJSON.dictionary(options.mapValues { AnyJSON.string($0) })
+        return try await call(.changeGlobalOption, params: [optionsJSON])
+    }
+
+    // MARK: - Queue Management
+
+    func changePosition(gid: String, pos: Int, how: String) async throws -> Int {
+        return try await call(.changePosition, params: [.string(gid), .int(pos), .string(how)])
+    }
+
+    // MARK: - Metalink
+
+    func addMetalink(metalink: String, options: [String: String]? = nil) async throws -> [String] {
+        var params: [AnyJSON] = [.string(metalink)]
+        if let options {
+            params.append(.dictionary(options.mapValues { AnyJSON.string($0) }))
+        }
+        return try await call(.addMetalink, params: params)
+    }
+
+    // MARK: - Session & Cleanup
+
+    func purgeDownloadResult() async throws -> String {
+        return try await call(.purgeDownloadResult)
+    }
+
+    func removeDownloadResult(gid: String) async throws -> String {
+        return try await call(.removeDownloadResult, params: [.string(gid)])
+    }
+
+    func getSessionInfo() async throws -> Aria2SessionInfoResponse {
+        return try await call(.getSessionInfo)
+    }
+
+    func saveSession() async throws -> String {
+        return try await call(.saveSession)
+    }
+
+    func shutdown() async throws -> String {
+        return try await call(.shutdown)
+    }
+
+    func forceShutdown() async throws -> String {
+        return try await call(.forceShutdown)
+    }
+
+    // MARK: - System Methods
+
+    func listMethods() async throws -> [String] {
+        return try await call(.systemListMethods)
+    }
+
+    func listNotifications() async throws -> [String] {
+        return try await call(.systemListNotifications)
+    }
+
     // MARK: - Download Processing
 
     func processStatus(_ status: Aria2StatusResponse) -> DownloadFile {
@@ -166,13 +280,20 @@ actor Aria2RPCClient {
         case "active": downloadStatus = .downloading
         case "waiting": downloadStatus = .pending
         case "paused": downloadStatus = .paused
-        case "complete", "removed": downloadStatus = .completed
+        case "complete":
+            if status.bittorrent != nil && status.seeder == "true" {
+                downloadStatus = .seeding
+            } else {
+                downloadStatus = .completed
+            }
+        case "removed": downloadStatus = .removed
         case "error": downloadStatus = .failed
         default: downloadStatus = .pending
         }
 
         let connections = status.connections.flatMap { Int($0) }
         let numSeeders = status.numSeeders.flatMap { Int($0) }
+        let uploadedSize = status.uploadLength.flatMap { Int64($0) }
 
         return DownloadFile(
             id: .deterministic(from: gid),
@@ -186,6 +307,7 @@ actor Aria2RPCClient {
             uploadSpeed: uploadSpeed,
             connections: connections,
             numSeeders: numSeeders,
+            uploadedSize: uploadedSize,
             status: downloadStatus
         )
     }

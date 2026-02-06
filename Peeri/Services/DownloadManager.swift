@@ -265,6 +265,19 @@ final class DownloadManager {
         logger.info("Download removed from list: \(download.fileName)")
     }
 
+    // MARK: - Settings Application
+
+    func applySettings(_ settings: PeeriSettings) async {
+        do {
+            let options = settings.toAria2GlobalOptions()
+            try await aria2Client.changeGlobalOption(options)
+            logger.info("Applied runtime settings to aria2")
+        } catch {
+            logger.error("Failed to apply settings: \(error)")
+            lastError = "Failed to apply settings: \(error.localizedDescription)"
+        }
+    }
+
     func showInFinder(_ download: DownloadFile) {
         if let filePath = download.filePath {
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])

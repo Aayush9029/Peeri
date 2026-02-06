@@ -1,9 +1,12 @@
+import Models
+import Shared
 import SwiftUI
 
 @main
 struct PeeriApp: App {
     @State private var downloadManager = DownloadManager()
-    
+    @Shared(.settings) var settings
+
     init() {
         startAria2Daemon()
     }
@@ -71,7 +74,7 @@ struct PeeriApp: App {
     private func setupAria2ConfigFile(using aria2cPath: String) {
         print("Setting up aria2 configuration...")
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
-        
+
         // Create logs directory if it doesn't exist
         let logsDir = "\(homeDir)/.peeri/logs"
         do {
@@ -79,7 +82,7 @@ struct PeeriApp: App {
         } catch {
             print("Failed to create logs directory: \(error)")
         }
-        
+
         // Create .aria2 directory if it doesn't exist
         let aria2Dir = "\(homeDir)/.peeri/aria2"
         if !FileManager.default.fileExists(atPath: aria2Dir) {
@@ -90,47 +93,14 @@ struct PeeriApp: App {
                 fatalError("Cannot create required aria2 directory: \(error)")
             }
         }
-        
+
         // Path to log file
         let logPath = "\(logsDir)/aria2c.log"
-        
-        // Create config file
+
+        // Create config file from settings
         let configPath = "\(aria2Dir)/aria2.conf"
-        let configContent = """
-        # Basic configuration file for Aria2
-        
-        # Downloads directory
-        dir=\(homeDir)/Downloads
-        
-        # Enable JSON-RPC server
-        enable-rpc=true
-        rpc-listen-all=true
-        rpc-listen-port=16800
-        rpc-secret=peeri
-        
-        # BitTorrent settings
-        bt-enable-lpd=true
-        bt-max-peers=50
-        bt-request-peer-speed-limit=100K
-        enable-peer-exchange=true
-        
-        # Connection settings
-        max-concurrent-downloads=5
-        max-connection-per-server=10
-        max-overall-download-limit=0
-        max-overall-upload-limit=50K
-        min-split-size=1M
-        split=10
-        
-        # Logging
-        log=\(logPath)
-        log-level=info
-        
-        # Other settings
-        check-integrity=true
-        continue=true
-        """
-        
+        let configContent = settings.toAria2ConfigString(logPath: logPath)
+
         do {
             try configContent.write(toFile: configPath, atomically: true, encoding: .utf8)
             print("Created aria2 config file at \(configPath)")
@@ -138,10 +108,10 @@ struct PeeriApp: App {
             print("Critical error - failed to create aria2 config file: \(error)")
             fatalError("Cannot create required aria2 config file: \(error)")
         }
-        
+
         // Kill any existing aria2c processes
         killExistingAria2Processes()
-        
+
         // Start aria2c with our config
         startAria2Process(executablePath: aria2cPath, configPath: configPath, logPath: logPath)
     }
@@ -242,6 +212,11 @@ struct PeeriApp: App {
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
+        }
+
+        Settings {
+            SettingsView()
+                .environment(downloadManager)
         }
     }
     

@@ -16,6 +16,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var uploadSpeed: Int64?
     public var connections: Int?
     public var numSeeders: Int?
+    public var uploadedSize: Int64?
     public var status: DownloadStatus
 
     public init(
@@ -30,6 +31,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         uploadSpeed: Int64? = nil,
         connections: Int? = nil,
         numSeeders: Int? = nil,
+        uploadedSize: Int64? = nil,
         status: DownloadStatus = .pending
     ) {
         self.id = id
@@ -43,6 +45,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.uploadSpeed = uploadSpeed
         self.connections = connections
         self.numSeeders = numSeeders
+        self.uploadedSize = uploadedSize
         self.status = status
     }
 
@@ -64,6 +67,38 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         guard remaining > 0 else { return nil }
         return TimeInterval(remaining) / TimeInterval(speed)
     }
+
+    /// Whether this download is currently seeding
+    public var isSeeding: Bool { status == .seeding }
+
+    /// Progress as a formatted percentage string (e.g. "45.2%")
+    public var progressPercentage: String {
+        let pct = progress * 100
+        if pct >= 100 { return "100%" }
+        return String(format: "%.1f%%", pct)
+    }
+
+    /// Human-readable download speed (e.g. "1.2 MB/s")
+    public var formattedSpeed: String {
+        guard let speed = downloadSpeed, speed > 0 else { return "0 B/s" }
+        return ByteCountFormatter.string(fromByteCount: speed, countStyle: .binary) + "/s"
+    }
+
+    /// Human-readable file size (e.g. "4.5 GB")
+    public var formattedSize: String {
+        guard let size = fileSize, size > 0 else { return "Unknown" }
+        return ByteCountFormatter.string(fromByteCount: size, countStyle: .binary)
+    }
+
+    /// Human-readable ETA (e.g. "2h 15m" or "< 1m")
+    public var formattedETA: String {
+        guard let seconds = eta else { return "--" }
+        if seconds < 60 { return "< 1m" }
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        if hours > 0 { return "\(hours)h \(minutes)m" }
+        return "\(minutes)m"
+    }
 }
 
 public enum DownloadStatus: String, Codable {
@@ -72,6 +107,8 @@ public enum DownloadStatus: String, Codable {
     case paused
     case completed
     case failed
+    case seeding
+    case removed
 }
 
 // MARK: - Deterministic ID from GID
