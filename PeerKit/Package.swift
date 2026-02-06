@@ -42,13 +42,13 @@ let package = Package(
         .library(name: "Aria2Client", targets: ["Aria2Client"])
     ],
     dependencies: [
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.7.0"),
-        .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.1.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.11.0"),
+        .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.1.1"),
         .package(url: "https://github.com/rurza/KeyboardShortcuts.git", branch: "main"),
-        .package(url: "https://github.com/pointfreeco/swift-sharing.git", from: "2.4.0"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing.git", from: "2.7.4"),
         .package(url: "https://github.com/Clipy/Sauce.git", from: "2.4.1"),
-        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.8.1"),
-        .package(url: "https://github.com/Flight-School/AnyCodable", from: "0.6.0")
+        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.11.1"),
+        .package(url: "https://github.com/Flight-School/AnyCodable", from: "0.6.7")
     ],
     targets: [
         .target(
