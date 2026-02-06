@@ -16,32 +16,32 @@ struct DownloadListView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.quaternary)
                 Text("No downloads yet")
-                    .font(.title2)
+                    .font(.title)
                     .foregroundStyle(.secondary)
                 Text("Add a download to get started")
-                    .font(.callout)
+                    .font(.body)
                     .foregroundStyle(.tertiary)
                 Spacer()
             }
         } else {
             VStack(spacing: 0) {
-                // Column headers
+                // Column headers — pinned above scroll
                 columnHeaders
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 4)
+                    .padding(12)
 
                 Divider()
                     .padding(.horizontal, 8)
 
                 ScrollView {
-                    LazyVStack(spacing: 2) {
+                    LazyVStack(spacing: 6) {
                         ForEach(downloads) { download in
                             DownloadRow(download: download)
                         }
                     }
                     .padding(.horizontal, 4)
-                    .padding(.top, 4)
+                    .padding(.top, 6)
                 }
+                .frame(maxHeight: .infinity)
             }
         }
     }
@@ -85,8 +85,8 @@ struct DownloadListView: View {
                     .frame(width: 50, alignment: .leading)
             }
         }
-        .font(.caption)
+        .font(.callout)
         .foregroundStyle(.secondary)
-        .padding(.horizontal, 12)
+        .padding(.horizontal)
     }
 }

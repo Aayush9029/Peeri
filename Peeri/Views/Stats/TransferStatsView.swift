@@ -27,7 +27,7 @@ struct TransferStatsView: View {
 
             VStack(alignment: .leading) {
                 Text("DOWNLOAD / UPLOAD PER SEC")
-                    .font(.callout)
+                    .font(.body)
                     .foregroundStyle(.secondary)
                 Spacer()
                 HStack {
@@ -46,19 +46,19 @@ struct TransferStatsView: View {
                 VStack(alignment: .leading, spacing: 32) {
                     VStack(alignment: .leading) {
                         Text("Total Downloaded")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                         Text(ByteCountFormatter.string(fromByteCount: totalDownloaded, countStyle: .binary))
                     }
 
                     VStack(alignment: .leading) {
                         Text("Total Uploaded")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                         Text(ByteCountFormatter.string(fromByteCount: totalUploaded, countStyle: .binary))
                     }
                 }
-                .font(.title2)
+                .font(.title)
                 Spacer()
             }.padding()
         }
@@ -135,6 +135,7 @@ struct TransferChart: View {
                 .chartYScale(domain: 0...maxValue)
                 .saturation(1.25)
             }
+            .animation(.smooth(duration: 0.8), value: numbers)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(

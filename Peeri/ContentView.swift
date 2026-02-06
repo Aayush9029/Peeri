@@ -23,7 +23,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Toolbar
             toolbar
-                .padding(.horizontal, 12)
+                .padding(.horizontal)
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
@@ -64,13 +64,13 @@ struct ContentView: View {
                 }
             } label: {
                 Image(systemName: "sidebar.left")
-                    .font(.title3)
+                    .font(.title2)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
 
             Text("Peeri")
-                .font(.title3.bold())
+                .font(.title2.bold())
 
             connectionDot
 
@@ -152,7 +152,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: statsCollapsed ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(width: 24, height: 16)
                         .background(.bar)
@@ -163,25 +163,33 @@ struct ContentView: View {
             .padding(.vertical, 4)
 
             if statsCollapsed {
-                // Compact inline stats bar
+                // Compact inline stats bar with speeds + totals
                 HStack(spacing: 16) {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.down")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.blue)
                         Text(ByteCountFormatter.string(fromByteCount: downloadManager.totalDownloadRate, countStyle: .binary) + "/s")
-                            .font(.callout.monospacedDigit())
+                            .font(.body.monospacedDigit())
                     }
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.up")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.green)
                         Text(ByteCountFormatter.string(fromByteCount: downloadManager.totalUploadRate, countStyle: .binary) + "/s")
-                            .font(.callout.monospacedDigit())
+                            .font(.body.monospacedDigit())
                     }
+
                     Spacer()
+
+                    Text("DL: " + ByteCountFormatter.string(fromByteCount: downloadManager.sessionDownloaded, countStyle: .binary))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Text("UL: " + ByteCountFormatter.string(fromByteCount: downloadManager.sessionUploaded, countStyle: .binary))
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal)
                 .frame(height: 32)
                 .transition(.opacity)
             } else {

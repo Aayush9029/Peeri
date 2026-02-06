@@ -10,13 +10,13 @@ struct DownloadRow: View {
         HStack(spacing: 0) {
             // Status icon
             statusIcon
-                .font(.caption)
+                .font(.body)
                 .foregroundStyle(statusColor)
                 .frame(width: 28)
 
             // Name
             Text(download.fileName)
-                .font(.callout)
+                .font(.body)
                 .lineLimit(1)
                 .frame(minWidth: 120, alignment: .leading)
 
@@ -30,7 +30,7 @@ struct DownloadRow: View {
 
             // Size
             Text(formattedSize)
-                .font(.callout)
+                .font(.body)
                 .foregroundStyle(.secondary)
                 .frame(width: 80, alignment: .leading)
 
@@ -38,7 +38,7 @@ struct DownloadRow: View {
 
             // Time left / Status
             Text(timeLeftText)
-                .font(.callout)
+                .font(.body)
                 .foregroundStyle(.secondary)
                 .frame(width: 90, alignment: .leading)
 
@@ -46,7 +46,7 @@ struct DownloadRow: View {
 
             // Speed
             Text(speedText)
-                .font(.callout)
+                .font(.body)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
                 .frame(width: 90, alignment: .leading)
@@ -55,27 +55,30 @@ struct DownloadRow: View {
             if download.isTorrent {
                 Spacer(minLength: 12)
                 Text(download.numSeeders.map { "\($0)" } ?? "—")
-                    .font(.callout)
+                    .font(.body)
                     .foregroundStyle(.secondary)
                     .frame(width: 50, alignment: .leading)
 
                 Spacer(minLength: 12)
                 Text(download.connections.map { "\($0)" } ?? "—")
-                    .font(.callout)
+                    .font(.body)
                     .foregroundStyle(.secondary)
                     .frame(width: 50, alignment: .leading)
             }
-
-            // Inline hover actions
+        }
+        .padding(12)
+        .frame(minHeight: 44)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovered ? Color.gray.opacity(0.12) : Color.gray.opacity(0.05))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .trailing) {
             if isHovered {
                 hoverActions
                     .transition(.opacity)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(rowBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
@@ -210,66 +213,37 @@ struct DownloadRow: View {
         }
     }
 
-    // MARK: - Row Background
-
-    private var rowBackground: some View {
-        Group {
-            if isHovered {
-                Color.gray.opacity(0.1)
-            } else {
-                Color.clear
-            }
-        }
-    }
-
     // MARK: - Hover Actions
 
     private var hoverActions: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             switch download.status {
             case .downloading:
-                hoverButton(icon: "pause.fill", tooltip: "Pause") { Task { await downloadManager.pauseDownload(download) } }
-                hoverButton(icon: "folder", tooltip: "Show in Finder") { downloadManager.showInFinder(download) }
-                hoverButton(icon: "xmark", tooltip: "Cancel", color: .red) { Task { await downloadManager.cancelDownload(download) } }
+                HoverableActionButton(icon: "pause.fill", tooltip: "Pause") { Task { await downloadManager.pauseDownload(download) } }
+                HoverableActionButton(icon: "folder", tooltip: "Show in Finder") { downloadManager.showInFinder(download) }
+                HoverableActionButton(icon: "trash", tooltip: "Cancel", hoverColor: .red) { Task { await downloadManager.cancelDownload(download) } }
 
             case .paused:
-                hoverButton(icon: "play.fill", tooltip: "Resume") { Task { await downloadManager.resumeDownload(download) } }
-                hoverButton(icon: "folder", tooltip: "Show in Finder") { downloadManager.showInFinder(download) }
-                hoverButton(icon: "xmark", tooltip: "Cancel", color: .red) { Task { await downloadManager.cancelDownload(download) } }
+                HoverableActionButton(icon: "play.fill", tooltip: "Resume") { Task { await downloadManager.resumeDownload(download) } }
+                HoverableActionButton(icon: "folder", tooltip: "Show in Finder") { downloadManager.showInFinder(download) }
+                HoverableActionButton(icon: "trash", tooltip: "Cancel", hoverColor: .red) { Task { await downloadManager.cancelDownload(download) } }
 
             case .completed, .seeding:
-                hoverButton(icon: "folder", tooltip: "Show in Finder") { downloadManager.showInFinder(download) }
-                hoverButton(icon: "trash", tooltip: "Delete", color: .red) { downloadManager.removeDownload(download) }
+                HoverableActionButton(icon: "folder", tooltip: "Show in Finder") { downloadManager.showInFinder(download) }
+                HoverableActionButton(icon: "trash", tooltip: "Delete", hoverColor: .red) { downloadManager.removeDownload(download) }
 
             case .failed:
-                hoverButton(icon: "arrow.clockwise", tooltip: "Retry") { Task { await downloadManager.addDownload(url: download.url) } }
-                hoverButton(icon: "trash", tooltip: "Remove", color: .red) { downloadManager.removeDownload(download) }
+                HoverableActionButton(icon: "arrow.clockwise", tooltip: "Retry") { Task { await downloadManager.addDownload(url: download.url) } }
+                HoverableActionButton(icon: "trash", tooltip: "Remove", hoverColor: .red) { downloadManager.removeDownload(download) }
 
             case .pending:
-                hoverButton(icon: "xmark", tooltip: "Cancel", color: .red) { Task { await downloadManager.cancelDownload(download) } }
+                HoverableActionButton(icon: "trash", tooltip: "Cancel", hoverColor: .red) { Task { await downloadManager.cancelDownload(download) } }
 
             case .removed:
-                hoverButton(icon: "trash", tooltip: "Remove", color: .red) { downloadManager.removeDownload(download) }
+                HoverableActionButton(icon: "trash", tooltip: "Remove", hoverColor: .red) { downloadManager.removeDownload(download) }
             }
         }
-        .padding(.leading, 8)
-    }
-
-    private func hoverButton(
-        icon: String,
-        tooltip: String,
-        color: Color = .primary,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.callout)
-                .foregroundStyle(color)
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(tooltip)
+        .padding(.trailing, 12)
     }
 
     // MARK: - Context Menu
@@ -322,6 +296,33 @@ struct DownloadRow: View {
         case .failed: return .red
         case .seeding: return .teal
         case .removed: return .gray
+        }
+    }
+}
+
+// MARK: - Hoverable Action Button
+
+private struct HoverableActionButton: View {
+    let icon: String
+    let tooltip: String
+    var hoverColor: Color = .primary
+    let action: () -> Void
+    @State private var isButtonHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(isButtonHovered ? hoverColor : .secondary)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isButtonHovered = hovering
+            }
         }
     }
 }

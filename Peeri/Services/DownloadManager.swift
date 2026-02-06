@@ -310,10 +310,12 @@ final class DownloadManager {
             || activeFiles.contains(where: { $0.status == .downloading || $0.status == .seeding })
 
         if hasActivity {
-            downloadSpeedHistory.append(Double(dlRate))
-            uploadSpeedHistory.append(Double(ulRate))
-            if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
-            if uploadSpeedHistory.count > 60 { uploadSpeedHistory.removeFirst() }
+            withAnimation(.smooth(duration: 0.8)) {
+                downloadSpeedHistory.append(Double(dlRate))
+                uploadSpeedHistory.append(Double(ulRate))
+                if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
+                if uploadSpeedHistory.count > 60 { uploadSpeedHistory.removeFirst() }
+            }
         }
     }
 

@@ -48,10 +48,10 @@ struct SideBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("OVERVIEW")
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8)
-                .padding(.bottom, 2)
+                .padding(.bottom, 8)
 
             ForEach(DownloadFilter.allCases) { filter in
                 let count = filter.filter(downloads).count
@@ -89,11 +89,11 @@ struct SideBarRow: View {
         HStack {
             Image(systemName: icon)
                 .imageScale(.medium)
-                .frame(width: 18, height: 18)
+                .frame(width: 20, height: 20)
             Text(name)
             Spacer()
             Text("\(count)")
-                .font(.callout)
+                .font(.body)
                 .foregroundStyle(selected ? .blue : .secondary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
@@ -102,9 +102,8 @@ struct SideBarRow: View {
                         .fill(Color.gray.opacity(0.15))
                 )
         }
-        .font(.callout)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .font(.body)
+        .padding(8)
         .foregroundStyle(selected ? .blue : .primary)
         .opacity(selected ? 1 : 0.75)
         .fontWeight(selected ? .semibold : .regular)
