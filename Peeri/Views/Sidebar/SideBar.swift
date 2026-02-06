@@ -6,6 +6,7 @@
 //
 
 import Models
+import Shared
 import SwiftUI
 
 enum DownloadFilter: String, CaseIterable, Identifiable {
@@ -13,9 +14,9 @@ enum DownloadFilter: String, CaseIterable, Identifiable {
     case downloading = "Downloading"
     case paused = "Paused"
     case completed = "Completed"
-    
+
     var id: String { rawValue }
-    
+
     var icon: String {
         switch self {
         case .all: return "diamond"
@@ -24,11 +25,11 @@ enum DownloadFilter: String, CaseIterable, Identifiable {
         case .completed: return "checkmark"
         }
     }
-    
-    func filter(_ downloads: [DownloadFile]) -> [DownloadFile] {
+
+    func filter(_ downloads: IdentifiedArrayOf<DownloadFile>) -> [DownloadFile] {
         switch self {
         case .all:
-            return downloads
+            return Array(downloads)
         case .downloading:
             return downloads.filter { $0.status == .downloading }
         case .paused:

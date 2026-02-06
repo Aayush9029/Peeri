@@ -14,7 +14,7 @@ extension Target.Dependency {
     // Core Services
     static let clipboardClient: Self = "ClipboardClient"
     static let analyticsClient: Self = "AnalyticsClient"
-    static let aria2Client: Self = "Aria2Client"
+    static let aria2Kit: Self = "Aria2Kit"
 
     // External Dependencies
     static let swiftDependencies: Self = .product(name: "Dependencies", package: "swift-dependencies")
@@ -23,8 +23,6 @@ extension Target.Dependency {
     static let identifiedCollections: Self = .product(name: "IdentifiedCollections", package: "swift-identified-collections")
     static let sauce: Self = .product(name: "Sauce", package: "Sauce")
     static let keyboardShortcuts: Self = .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts")
-    static let alamofire: Self = .product(name: "Alamofire", package: "Alamofire")
-    static let anyCodable: Self = .product(name: "AnyCodable", package: "AnyCodable")
 }
 
 let package = Package(
@@ -39,16 +37,14 @@ let package = Package(
         .library(name: "ClipboardClient", targets: ["ClipboardClient"]),
         .library(name: "AnalyticsClient", targets: ["AnalyticsClient"]),
         .library(name: "Shared", targets: ["Shared"]),
-        .library(name: "Aria2Client", targets: ["Aria2Client"])
+        .library(name: "Aria2Kit", targets: ["Aria2Kit"])
     ],
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.11.0"),
         .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.1.1"),
         .package(url: "https://github.com/rurza/KeyboardShortcuts.git", branch: "main"),
         .package(url: "https://github.com/pointfreeco/swift-sharing.git", from: "2.7.4"),
-        .package(url: "https://github.com/Clipy/Sauce.git", from: "2.4.1"),
-        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.11.1"),
-        .package(url: "https://github.com/Flight-School/AnyCodable", from: "0.6.7")
+        .package(url: "https://github.com/Clipy/Sauce.git", from: "2.4.1")
     ],
     targets: [
         .target(
@@ -94,13 +90,24 @@ let package = Package(
             ]
         ),
         .target(
-            name: "Aria2Client",
+            name: "Aria2Kit",
             dependencies: [
                 .models,
                 .swiftDependencies,
-                .swiftDependenciesMacros,
-                .alamofire,
-                .anyCodable
+                .swiftDependenciesMacros
+            ]
+        ),
+        .testTarget(
+            name: "Aria2KitTests",
+            dependencies: [
+                .aria2Kit,
+                .swiftDependencies
+            ]
+        ),
+        .testTarget(
+            name: "ModelsTests",
+            dependencies: [
+                .models
             ]
         )
     ]

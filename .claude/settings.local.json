@@ -1,14 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Bash(ls:*)",
-      "Bash(mkdir:*)",
-      "Bash(chmod:*)",
-      "Bash(grep:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
-    ],
-    "deny": []
+      "Bash(swift build:*)",
+      "Bash(swift test:*)"
+    ]
   }
 }
