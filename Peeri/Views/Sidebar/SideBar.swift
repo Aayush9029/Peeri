@@ -3,19 +3,23 @@ import Shared
 import SwiftUI
 
 enum DownloadFilter: String, CaseIterable, Identifiable {
-    case all = "Overview"
+    case all = "All"
     case downloading = "Downloading"
+    case seeding = "Seeding"
     case paused = "Paused"
     case completed = "Completed"
+    case failed = "Failed"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .all: return "diamond"
+        case .all: return "square.grid.2x2"
         case .downloading: return "arrow.down"
+        case .seeding: return "arrow.up"
         case .paused: return "pause"
         case .completed: return "checkmark"
+        case .failed: return "exclamationmark.triangle"
         }
     }
 
@@ -24,56 +28,48 @@ enum DownloadFilter: String, CaseIterable, Identifiable {
         case .all:
             return Array(downloads)
         case .downloading:
-            return downloads.filter { $0.status == .downloading }
+            return downloads.filter { $0.status == .downloading || $0.status == .pending }
+        case .seeding:
+            return downloads.filter { $0.status == .seeding }
         case .paused:
             return downloads.filter { $0.status == .paused }
         case .completed:
             return downloads.filter { $0.status == .completed }
+        case .failed:
+            return downloads.filter { $0.status == .failed }
         }
     }
 }
 
 struct SideBar: View {
     @Binding var selectedFilter: DownloadFilter
-    let activeCount: Int
-    let pausedCount: Int
-    let completedCount: Int
+    let downloads: IdentifiedArrayOf<DownloadFile>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("OVERVIEW")
+            Text("FILTERS")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 8)
                 .padding(.bottom, 2)
 
             ForEach(DownloadFilter.allCases) { filter in
-                SideBarRow(
-                    filter.rawValue,
-                    icon: filter.icon,
-                    count: getCount(for: filter),
-                    selected: selectedFilter == filter
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectedFilter = filter
+                let count = filter.filter(downloads).count
+                if filter == .all || count > 0 {
+                    SideBarRow(
+                        filter.rawValue,
+                        icon: filter.icon,
+                        count: count,
+                        selected: selectedFilter == filter
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedFilter = filter
+                    }
                 }
             }
 
             Spacer()
-        }
-    }
-
-    private func getCount(for filter: DownloadFilter) -> Int {
-        switch filter {
-        case .all:
-            return activeCount + pausedCount + completedCount
-        case .downloading:
-            return activeCount
-        case .paused:
-            return pausedCount
-        case .completed:
-            return completedCount
         }
     }
 }
@@ -123,9 +119,7 @@ struct SideBarRow: View {
 #Preview {
     SideBar(
         selectedFilter: .constant(.all),
-        activeCount: 3,
-        pausedCount: 1,
-        completedCount: 5
+        downloads: []
     )
     .padding()
     .frame(width: 240)

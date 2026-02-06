@@ -8,7 +8,6 @@ struct TransferStatsView: View {
     let uploadHistory: [Double]
     let totalDownloaded: Int64
     let totalUploaded: Int64
-    let formatBytes: (Int64) -> String
 
     var body: some View {
         HStack {
@@ -40,14 +39,14 @@ struct TransferStatsView: View {
                             Text("Total Downloaded")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(formatBytes(totalDownloaded))
+                            Text(ByteCountFormatter.string(fromByteCount: totalDownloaded, countStyle: .binary))
                         }
 
                         VStack(alignment: .leading) {
                             Text("Total Uploaded")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(formatBytes(totalUploaded))
+                            Text(ByteCountFormatter.string(fromByteCount: totalUploaded, countStyle: .binary))
                         }
                     }
                     Spacer()

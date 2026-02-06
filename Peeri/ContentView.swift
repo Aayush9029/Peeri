@@ -112,9 +112,7 @@ struct ContentView: View {
         VStack {
             SideBar(
                 selectedFilter: $selectedFilter,
-                activeCount: downloadManager.activeDownloads.count,
-                pausedCount: downloadManager.pausedDownloads.count,
-                completedCount: downloadManager.completedDownloads.count
+                downloads: downloadManager.downloads
             )
             Spacer()
         }
@@ -129,10 +127,7 @@ struct ContentView: View {
 
     private var contentPanel: some View {
         VStack {
-            DownloadListView(
-                downloads: filteredDownloads,
-                downloadManager: downloadManager
-            )
+            DownloadListView(downloads: filteredDownloads)
             Divider()
                 .padding(.vertical)
             TransferStatsView(
@@ -141,8 +136,7 @@ struct ContentView: View {
                 downloadHistory: downloadManager.downloadSpeedHistory,
                 uploadHistory: downloadManager.uploadSpeedHistory,
                 totalDownloaded: downloadManager.sessionDownloaded,
-                totalUploaded: downloadManager.sessionUploaded,
-                formatBytes: downloadManager.formatBytes
+                totalUploaded: downloadManager.sessionUploaded
             )
             .frame(height: 320)
             .padding()

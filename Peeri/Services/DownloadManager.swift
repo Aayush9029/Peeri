@@ -63,25 +63,8 @@ final class DownloadManager {
     private var hasEverConnected = false
 
     init() {
-        setupNotificationObservers()
         initializeAria2Client()
         checkConnectionAndStartTimer()
-    }
-
-    private func setupNotificationObservers() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleAria2NotAvailable(_:)),
-            name: NSNotification.Name("Aria2NotAvailable"),
-            object: nil
-        )
-    }
-
-    @objc private func handleAria2NotAvailable(_ notification: Notification) {
-        Task { @MainActor in
-            lastError = notification.userInfo?["message"] as? String ?? "Aria2 is not available."
-            connectionState = .failed(NSError(domain: "Aria2", code: 1, userInfo: [NSLocalizedDescriptionKey: lastError!]))
-        }
     }
 
     private func initializeAria2Client() {
@@ -93,33 +76,25 @@ final class DownloadManager {
     private func checkConnectionAndStartTimer() {
         connectionState = .connecting
         startUpdateTimer()
-        attemptConnection(retryCount: 0, maxRetries: 30)
+        Task { await attemptConnection() }
     }
 
-    private func attemptConnection(retryCount: Int, maxRetries: Int) {
-        // First few attempts are fast, then back off
-        let delay: Double
-        if retryCount == 0 {
-            delay = 0.2  // Try immediately first
-        } else if retryCount < 5 {
-            delay = Double(retryCount) * 0.3  // 0.3s, 0.6s, 0.9s, 1.2s, 1.5s
-        } else {
-            delay = min(Double(retryCount) * 0.5 + 2.0, 10.0)  // Cap at 10s
-        }
-
-        guard retryCount <= maxRetries else {
-            attemptConnection(retryCount: 0, maxRetries: maxRetries)
-            return
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            Task {
-                let success = await self.verifyConnection()
-                if !success {
-                    self.attemptConnection(retryCount: retryCount + 1, maxRetries: maxRetries)
-                }
+    private func attemptConnection(maxRetries: Int = 30) async {
+        for attempt in 0...maxRetries {
+            let delay: UInt64
+            if attempt == 0 {
+                delay = 200_000_000 // 0.2s
+            } else if attempt < 5 {
+                delay = UInt64(Double(attempt) * 0.3 * 1_000_000_000)
+            } else {
+                delay = UInt64(min(Double(attempt) * 0.5 + 2.0, 10.0) * 1_000_000_000)
             }
+
+            try? await Task.sleep(nanoseconds: delay)
+            if await verifyConnection() { return }
         }
+        // If all retries exhausted, start over
+        await attemptConnection(maxRetries: maxRetries)
     }
 
     private func verifyConnection() async -> Bool {
@@ -338,27 +313,16 @@ final class DownloadManager {
     }
 
     private func updateGlobalStats() async {
-        guard let stats = try? await aria2Client.getGlobalStat() else { return }
-        sessionDownloaded += Int64(stats.downloadSpeed) ?? 0
-        sessionUploaded += Int64(stats.uploadSpeed) ?? 0
+        // Sum completed lengths from all downloads instead of accumulating speed values
+        let totalDown = downloads.reduce(Int64(0)) { $0 + $1.downloadedSize }
+        let totalUp = downloads.reduce(Int64(0)) { $0 + ($1.uploadedSize ?? 0) }
+        sessionDownloaded = totalDown
+        sessionUploaded = totalUp
     }
 
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
         let allNew = active + waiting + stopped
         $downloads.withLock { $0 = IdentifiedArray(uniqueElements: allNew) }
-    }
-
-    // MARK: - Helpers
-
-    func formatBytes(_ bytes: Int64) -> String {
-        let units = ["B", "KB", "MB", "GB", "TB"]
-        var value = Double(bytes)
-        var unitIndex = 0
-        while value > 1024 && unitIndex < units.count - 1 {
-            value /= 1024
-            unitIndex += 1
-        }
-        return String(format: "%.2f %@", value, units[unitIndex])
     }
 
     deinit {
