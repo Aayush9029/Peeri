@@ -1,7 +1,3 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## What is Peeri
 
 Peeri is a native macOS torrent/download client (SwiftUI, macOS 13.3+) that wraps the [aria2](https://aria2.github.io/) download daemon. The app bundles an `aria2c` binary, launches it as a child process on startup, and communicates with it over its JSON-RPC HTTP API (localhost:6800, token `peeri`).
