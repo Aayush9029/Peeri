@@ -1,6 +1,5 @@
 > [!NOTE]  
-> **Peeri** is currently in concept phase and not yet ready for development. Check back later, contributions are welcome.
-
+> **Peeri** it is currently in the design phase and not yet ready for public release. Contributions are welcome
 
 
 
