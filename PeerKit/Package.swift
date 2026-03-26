@@ -59,6 +59,7 @@ let package = Package(
             name: "Models",
             dependencies: [
                 .keyboardShortcuts,
+                .shared,
                 .swiftTagged
             ]
         ),
