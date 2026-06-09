@@ -49,6 +49,7 @@ struct DownloadModelTests {
     @Test("Codable round-trip")
     func downloadFileCodable() throws {
         let original = DownloadFile(
+            id: .deterministic(from: "deadbeef12345678"),
             gid: "deadbeef12345678",
             url: URL(string: "https://example.com/test.zip")!,
             fileName: "test.zip",
@@ -64,6 +65,7 @@ struct DownloadModelTests {
         let data = try encoder.encode(original)
         let decoded = try JSONDecoder().decode(DownloadFile.self, from: data)
 
+        #expect(decoded.id == original.id)
         #expect(decoded.gid == original.gid)
         #expect(decoded.url == original.url)
         #expect(decoded.fileName == original.fileName)
@@ -78,21 +80,22 @@ struct DownloadModelTests {
     @Test("Deterministic UUID from GID")
     func deterministicUUID() {
         let gid = "2089b05ecca3d829"
-        let uuid1 = UUID.deterministic(from: gid)
-        let uuid2 = UUID.deterministic(from: gid)
+        let uuid1 = DownloadFile.ID.deterministic(from: gid)
+        let uuid2 = DownloadFile.ID.deterministic(from: gid)
 
         // Same GID always produces same UUID
         #expect(uuid1 == uuid2)
+        #expect(uuid1.rawValue.uuidString == "2089B05E-CCA3-D829-0000-000000000000")
 
         // Different GID produces different UUID
-        let uuid3 = UUID.deterministic(from: "abc123def4567890")
+        let uuid3 = DownloadFile.ID.deterministic(from: "abc123def4567890")
         #expect(uuid1 != uuid3)
     }
 
     @Test("Deterministic UUID handles short GIDs")
     func deterministicUUIDShort() {
-        let uuid = UUID.deterministic(from: "abc")
-        #expect(uuid != UUID())
+        let uuid = DownloadFile.ID.deterministic(from: "abc")
+        #expect(uuid.rawValue.uuidString == "ABC00000-0000-0000-0000-000000000000")
     }
 
     @Test("DownloadStatus raw values")
@@ -117,21 +120,20 @@ struct DownloadModelTests {
             fileName: "file.zip"
         )
 
-        // Same id + same createdAt means equal
-        let fixedDate = Date(timeIntervalSince1970: 1000000)
+        #expect(file1 != file2)
+
+        // Same tagged id and values means equal
         let file3 = DownloadFile(
-            id: UUID.deterministic(from: "abc"),
+            id: .deterministic(from: "abc"),
             gid: "abc",
             url: URL(string: "https://example.com/file.zip")!,
-            fileName: "file.zip",
-            createdAt: fixedDate
+            fileName: "file.zip"
         )
         let file4 = DownloadFile(
-            id: UUID.deterministic(from: "abc"),
+            id: .deterministic(from: "abc"),
             gid: "abc",
             url: URL(string: "https://example.com/file.zip")!,
-            fileName: "file.zip",
-            createdAt: fixedDate
+            fileName: "file.zip"
         )
         #expect(file3 == file4)
     }

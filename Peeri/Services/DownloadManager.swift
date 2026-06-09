@@ -1,5 +1,4 @@
 import Aria2Kit
-import Combine
 import Foundation
 import IdentifiedCollections
 import Models
@@ -54,7 +53,8 @@ final class DownloadManager {
 
     @ObservationIgnored @Dependency(\.aria2Client) var aria2Client
 
-    nonisolated(unsafe) private var updateTimer: Timer?
+    @ObservationIgnored private var connectionTask: Task<Void, Never>?
+    @ObservationIgnored private var updateTask: Task<Void, Never>?
     private let aria2Host = "localhost"
     private let aria2Port: UInt16 = 16800
     private let aria2Token = "peeri"
@@ -75,26 +75,34 @@ final class DownloadManager {
 
     private func checkConnectionAndStartTimer() {
         connectionState = .connecting
-        startUpdateTimer()
-        Task { await attemptConnection() }
+        startUpdateLoop()
+        startConnectionTask()
+    }
+
+    private func startConnectionTask() {
+        connectionTask?.cancel()
+        connectionTask = Task { [weak self] in
+            await self?.attemptConnection()
+        }
     }
 
     private func attemptConnection(maxRetries: Int = 30) async {
-        for attempt in 0...maxRetries {
-            let delay: UInt64
-            if attempt == 0 {
-                delay = 200_000_000 // 0.2s
-            } else if attempt < 5 {
-                delay = UInt64(Double(attempt) * 0.3 * 1_000_000_000)
-            } else {
-                delay = UInt64(min(Double(attempt) * 0.5 + 2.0, 10.0) * 1_000_000_000)
-            }
+        while !Task.isCancelled {
+            for attempt in 0...maxRetries {
+                let delay: UInt64
+                if attempt == 0 {
+                    delay = 200_000_000 // 0.2s
+                } else if attempt < 5 {
+                    delay = UInt64(Double(attempt) * 0.3 * 1_000_000_000)
+                } else {
+                    delay = UInt64(min(Double(attempt) * 0.5 + 2.0, 10.0) * 1_000_000_000)
+                }
 
-            try? await Task.sleep(nanoseconds: delay)
-            if await verifyConnection() { return }
+                try? await Task.sleep(nanoseconds: delay)
+                if Task.isCancelled { return }
+                if await verifyConnection() { return }
+            }
         }
-        // If all retries exhausted, start over
-        await attemptConnection(maxRetries: maxRetries)
     }
 
     private func verifyConnection() async -> Bool {
@@ -152,10 +160,14 @@ final class DownloadManager {
         var errorDescription: String? { "Operation timed out" }
     }
 
-    private func startUpdateTimer() {
-        updateTimer?.invalidate()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { await self?.updateDownloads() }
+    private func startUpdateLoop() {
+        updateTask?.cancel()
+        updateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                await self?.updateDownloads()
+            }
         }
     }
 
@@ -175,7 +187,7 @@ final class DownloadManager {
             let newDownload = try await aria2Client.tellStatus(gid)
             $downloads.withLock { $0[id: newDownload.id] = newDownload }
 
-            Task { await updateDownloads() }
+            await updateDownloads()
         } catch {
             logger.error("Failed to add download: \(error.localizedDescription)")
             lastError = "Failed to add download: \(error.localizedDescription)"
@@ -189,7 +201,7 @@ final class DownloadManager {
 
             let gid = try await aria2Client.addTorrent(base64, [], ["dir": downloadDir])
             logger.info("Added torrent with GID: \(gid)")
-            Task { await updateDownloads() }
+            await updateDownloads()
         } catch {
             logger.error("Failed to add torrent: \(error.localizedDescription)")
             lastError = "Failed to add torrent: \(error.localizedDescription)"
@@ -227,7 +239,7 @@ final class DownloadManager {
             let success = try await aria2Client.remove(download.gid)
             guard success else { return }
 
-            $downloads.withLock { $0.remove(id: download.id) }
+            $downloads.withLock { _ = $0.remove(id: download.id) }
             logger.info("Download canceled: \(download.fileName)")
         } catch {
             logger.error("Failed to cancel download: \(error.localizedDescription)")
@@ -236,7 +248,7 @@ final class DownloadManager {
     }
 
     func removeDownload(_ download: DownloadFile) {
-        $downloads.withLock { $0.remove(id: download.id) }
+        $downloads.withLock { _ = $0.remove(id: download.id) }
         logger.info("Download removed from list: \(download.fileName)")
     }
 
@@ -333,7 +345,7 @@ final class DownloadManager {
     }
 
     deinit {
-        let timer = updateTimer
-        timer?.invalidate()
+        connectionTask?.cancel()
+        updateTask?.cancel()
     }
 }
