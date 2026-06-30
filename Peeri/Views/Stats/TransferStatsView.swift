@@ -1,4 +1,3 @@
-import Charts
 import SwiftUI
 
 struct TransferStatsView: View {
@@ -11,7 +10,7 @@ struct TransferStatsView: View {
     var allPaused: Bool = false
 
     private var hasUploadActivity: Bool {
-        uploadHistory.contains(where: { $0 > 0 })
+        uploadHistory.contains { $0 > 0 }
     }
 
     var body: some View {
@@ -44,23 +43,22 @@ struct TransferStatsView: View {
                 .font(.title.bold())
                 Spacer()
                 VStack(alignment: .leading, spacing: 32) {
-                    VStack(alignment: .leading) {
-                        Text("Total Downloaded")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        Text(ByteCountFormatter.string(fromByteCount: totalDownloaded, countStyle: .binary))
-                    }
-
-                    VStack(alignment: .leading) {
-                        Text("Total Uploaded")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                        Text(ByteCountFormatter.string(fromByteCount: totalUploaded, countStyle: .binary))
-                    }
+                    totalColumn("Total Downloaded", totalDownloaded)
+                    totalColumn("Total Uploaded", totalUploaded)
                 }
                 .font(.title)
                 Spacer()
-            }.padding()
+            }
+            .padding()
+        }
+    }
+
+    private func totalColumn(_ label: String, _ bytes: Int64) -> some View {
+        VStack(alignment: .leading) {
+            Text(label)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .binary))
         }
     }
 
@@ -73,74 +71,29 @@ struct TransferStatsView: View {
     }
 }
 
-struct TransferChart: View {
-    let numbers: [Double]
-    let tint: Color
+#Preview("Active") {
+    TransferStatsView(
+        downloadRate: 15_728_640,
+        uploadRate: 2_097_152,
+        downloadHistory: (0..<60).map { 12_000_000 * (1 + sin(Double($0) / 6)) },
+        uploadHistory: (0..<60).map { 1_500_000 * (1 + cos(Double($0) / 5)) },
+        totalDownloaded: 3_220_000_000,
+        totalUploaded: 1_073_741_824
+    )
+    .frame(width: 640, height: 320)
+    .padding()
+}
 
-    private var maxValue: Double {
-        max(numbers.max() ?? 0, 1024) * 1.25
-    }
-
-    var body: some View {
-        VStack {
-            ZStack {
-                Chart {
-                    ForEach(Array(numbers.enumerated()), id: \.offset) { index, value in
-                        LineMark(
-                            x: .value("Index", index),
-                            y: .value("Value", value)
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(tint)
-                        .lineStyle(.init(lineWidth: 6))
-
-                        if index == (numbers.count - 1) {
-                            PointMark(
-                                x: .value("Index", index),
-                                y: .value("Value", value)
-                            )
-                            .foregroundStyle(tint)
-                            .shadow(color: tint, radius: 12)
-                            .blur(radius: 32)
-                        }
-                    }
-                    .blur(radius: 42)
-                    .offset(y: 32)
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .chartYScale(domain: 0...maxValue)
-
-                Chart {
-                    ForEach(Array(numbers.enumerated()), id: \.offset) { index, value in
-                        LineMark(
-                            x: .value("Index", index),
-                            y: .value("Value", value)
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(tint)
-
-                        if index == (numbers.count - 1) {
-                            PointMark(
-                                x: .value("Index", index),
-                                y: .value("Value", value)
-                            )
-                            .foregroundStyle(tint)
-                            .shadow(color: tint, radius: 12)
-                        }
-                    }
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                .chartYScale(domain: 0...maxValue)
-                .saturation(1.25)
-            }
-            .animation(.smooth(duration: 0.8), value: numbers)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(LinearGradient(colors: [.clear, .gray.opacity(0.125)], startPoint: .leading, endPoint: .trailing), lineWidth: 2)
-        )
-    }
+#Preview("Paused") {
+    TransferStatsView(
+        downloadRate: 0,
+        uploadRate: 0,
+        downloadHistory: Array(repeating: 0, count: 60),
+        uploadHistory: Array(repeating: 0, count: 60),
+        totalDownloaded: 536_870_912,
+        totalUploaded: 0,
+        allPaused: true
+    )
+    .frame(width: 640, height: 320)
+    .padding()
 }

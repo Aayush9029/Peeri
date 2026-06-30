@@ -1,4 +1,5 @@
 import Aria2Kit
+import AppKit
 import Foundation
 import IdentifiedCollections
 import Models
@@ -13,8 +14,6 @@ enum ConnectionState {
     case failed(Error)
 }
 
-// MARK: - Shared Keys
-
 extension SharedKey where Self == FileStorageKey<IdentifiedArrayOf<DownloadFile>>.Default {
     static var downloads: Self {
         Self[.fileStorage(
@@ -26,7 +25,7 @@ extension SharedKey where Self == FileStorageKey<IdentifiedArrayOf<DownloadFile>
 @MainActor
 @Observable
 final class DownloadManager {
-    @ObservationIgnored @Shared(.downloads) var downloads
+    private(set) var downloads: IdentifiedArrayOf<DownloadFile> = []
 
     var totalDownloadRate: Int64 = 0
     var totalUploadRate: Int64 = 0
@@ -38,23 +37,26 @@ final class DownloadManager {
     var sessionDownloaded: Int64 = 0
     var sessionUploaded: Int64 = 0
 
-    // Computed category views — no more manual array sync
-    var activeDownloads: [DownloadFile] {
-        downloads.filter { $0.status == .downloading }
+    var activeDownloads: [DownloadFile] { downloads.filter { $0.status == .downloading } }
+    var pausedDownloads: [DownloadFile] { downloads.filter { $0.status == .paused } }
+    var completedDownloads: [DownloadFile] { downloads.filter { $0.status == .completed } }
+
+    var isConnected: Bool {
+        if case .connected = connectionState { return true }
+        return false
     }
 
-    var pausedDownloads: [DownloadFile] {
-        downloads.filter { $0.status == .paused }
+    var hasActiveTransfers: Bool {
+        downloads.contains { $0.status == .downloading || $0.status == .seeding }
     }
 
-    var completedDownloads: [DownloadFile] {
-        downloads.filter { $0.status == .completed }
-    }
-
-    @ObservationIgnored @Dependency(\.aria2Client) var aria2Client
+    @ObservationIgnored @Shared(.downloads) private var persistedDownloads
+    @ObservationIgnored @Dependency(\.aria2Client) private var aria2Client
 
     @ObservationIgnored private var connectionTask: Task<Void, Never>?
     @ObservationIgnored private var updateTask: Task<Void, Never>?
+    @ObservationIgnored private var lastPersistedSignature = 0
+
     private let aria2Host = "localhost"
     private let aria2Port: UInt16 = 16800
     private let aria2Token = "peeri"
@@ -62,7 +64,9 @@ final class DownloadManager {
 
     private var hasEverConnected = false
 
-    init() {
+    init(startPolling: Bool = true) {
+        downloads = persistedDownloads
+        guard startPolling else { return }
         initializeAria2Client()
         checkConnectionAndStartTimer()
     }
@@ -91,7 +95,7 @@ final class DownloadManager {
             for attempt in 0...maxRetries {
                 let delay: UInt64
                 if attempt == 0 {
-                    delay = 200_000_000 // 0.2s
+                    delay = 200_000_000
                 } else if attempt < 5 {
                     delay = UInt64(Double(attempt) * 0.3 * 1_000_000_000)
                 } else {
@@ -164,12 +168,15 @@ final class DownloadManager {
         updateTask?.cancel()
         updateTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                if Task.isCancelled { return }
                 await self?.updateDownloads()
+                let idle = self?.shouldIdle ?? true
+                try? await Task.sleep(nanoseconds: idle ? 2_500_000_000 : 1_000_000_000)
+                if Task.isCancelled { return }
             }
         }
     }
+
+    private var shouldIdle: Bool { isConnected && !hasActiveTransfers }
 
     // MARK: - Download Actions
 
@@ -185,7 +192,8 @@ final class DownloadManager {
             logger.info("Added download with GID: \(gid)")
 
             let newDownload = try await aria2Client.tellStatus(gid)
-            $downloads.withLock { $0[id: newDownload.id] = newDownload }
+            downloads[id: newDownload.id] = newDownload
+            persistIfStructureChanged()
 
             await updateDownloads()
         } catch {
@@ -210,10 +218,9 @@ final class DownloadManager {
 
     func pauseDownload(_ download: DownloadFile) async {
         do {
-            let success = try await aria2Client.pause(download.gid)
-            guard success else { return }
-
-            $downloads.withLock { $0[id: download.id]?.status = .paused }
+            guard try await aria2Client.pause(download.gid) else { return }
+            downloads[id: download.id]?.status = .paused
+            persistIfStructureChanged()
             logger.info("Download paused: \(download.fileName)")
         } catch {
             logger.error("Failed to pause download: \(error.localizedDescription)")
@@ -223,10 +230,9 @@ final class DownloadManager {
 
     func resumeDownload(_ download: DownloadFile) async {
         do {
-            let success = try await aria2Client.unpause(download.gid)
-            guard success else { return }
-
-            $downloads.withLock { $0[id: download.id]?.status = .downloading }
+            guard try await aria2Client.unpause(download.gid) else { return }
+            downloads[id: download.id]?.status = .downloading
+            persistIfStructureChanged()
             logger.info("Download resumed: \(download.fileName)")
         } catch {
             logger.error("Failed to resume download: \(error.localizedDescription)")
@@ -236,10 +242,9 @@ final class DownloadManager {
 
     func cancelDownload(_ download: DownloadFile) async {
         do {
-            let success = try await aria2Client.remove(download.gid)
-            guard success else { return }
-
-            $downloads.withLock { _ = $0.remove(id: download.id) }
+            guard try await aria2Client.remove(download.gid) else { return }
+            downloads.remove(id: download.id)
+            persistIfStructureChanged()
             logger.info("Download canceled: \(download.fileName)")
         } catch {
             logger.error("Failed to cancel download: \(error.localizedDescription)")
@@ -248,22 +253,36 @@ final class DownloadManager {
     }
 
     func removeDownload(_ download: DownloadFile) {
-        $downloads.withLock { _ = $0.remove(id: download.id) }
+        downloads.remove(id: download.id)
+        persistIfStructureChanged()
         logger.info("Download removed from list: \(download.fileName)")
     }
 
-    // MARK: - Settings Application
+    func retryDownload(_ download: DownloadFile) async {
+        await addDownload(url: download.url)
+    }
 
-    func applySettings(_ settings: PeeriSettings) async {
+    // MARK: - Detail Queries
+
+    func peers(for gid: String) async -> [Aria2PeerInfo] {
         do {
-            let options = settings.toAria2GlobalOptions()
-            try await aria2Client.changeGlobalOption(options)
-            logger.info("Applied runtime settings to aria2")
+            return try await aria2Client.getPeers(gid)
         } catch {
-            logger.error("Failed to apply settings: \(error)")
-            lastError = "Failed to apply settings: \(error.localizedDescription)"
+            logger.error("Failed to fetch peers for \(gid): \(error.localizedDescription)")
+            return []
         }
     }
+
+    func servers(for gid: String) async -> [Aria2ServerGroup] {
+        do {
+            return try await aria2Client.getServers(gid)
+        } catch {
+            logger.error("Failed to fetch servers for \(gid): \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    // MARK: - Clipboard & Finder
 
     func showInFinder(_ download: DownloadFile) {
         if let filePath = download.filePath {
@@ -277,7 +296,33 @@ final class DownloadManager {
         }
     }
 
-    // MARK: - Polling & Updates
+    func copyURL(_ download: DownloadFile) {
+        copyToPasteboard(download.url.absoluteString)
+    }
+
+    func copyFilePath(_ download: DownloadFile) {
+        guard let filePath = download.filePath else { return }
+        copyToPasteboard(filePath)
+    }
+
+    private func copyToPasteboard(_ string: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(string, forType: .string)
+    }
+
+    // MARK: - Settings
+
+    func applySettings(_ settings: PeeriSettings) async {
+        do {
+            try await aria2Client.changeGlobalOption(settings.toAria2GlobalOptions())
+            logger.info("Applied runtime settings to aria2")
+        } catch {
+            logger.error("Failed to apply settings: \(error)")
+            lastError = "Failed to apply settings: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Polling
 
     private func updateDownloads() async {
         do {
@@ -288,12 +333,13 @@ final class DownloadManager {
                 return
             }
 
-            let activeFiles = try await aria2Client.tellActive()
-            let waitingFiles = try await aria2Client.tellWaiting(0, 30)
-            let stoppedFiles = try await aria2Client.tellStopped(0, 100)
+            async let active = aria2Client.tellActive()
+            async let waiting = aria2Client.tellWaiting(0, 30)
+            async let stopped = aria2Client.tellStopped(0, 100)
+            let (activeFiles, waitingFiles, stoppedFiles) = try await (active, waiting, stopped)
 
             updateStatistics(activeFiles)
-            await updateGlobalStats()
+            updateSessionTotals()
             updateDownloadList(active: activeFiles, waiting: waitingFiles, stopped: stoppedFiles)
 
             if case .failed = connectionState {
@@ -319,29 +365,35 @@ final class DownloadManager {
         totalUploadRate = ulRate
 
         let hasActivity = dlRate > 0 || ulRate > 0
-            || activeFiles.contains(where: { $0.status == .downloading || $0.status == .seeding })
+            || activeFiles.contains { $0.status == .downloading || $0.status == .seeding }
 
-        if hasActivity {
-            withAnimation(.smooth(duration: 0.8)) {
-                downloadSpeedHistory.append(Double(dlRate))
-                uploadSpeedHistory.append(Double(ulRate))
-                if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
-                if uploadSpeedHistory.count > 60 { uploadSpeedHistory.removeFirst() }
-            }
-        }
+        guard hasActivity else { return }
+        downloadSpeedHistory.append(Double(dlRate))
+        uploadSpeedHistory.append(Double(ulRate))
+        if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
+        if uploadSpeedHistory.count > 60 { uploadSpeedHistory.removeFirst() }
     }
 
-    private func updateGlobalStats() async {
-        // Sum completed lengths from all downloads instead of accumulating speed values
-        let totalDown = downloads.reduce(Int64(0)) { $0 + $1.downloadedSize }
-        let totalUp = downloads.reduce(Int64(0)) { $0 + ($1.uploadedSize ?? 0) }
-        sessionDownloaded = totalDown
-        sessionUploaded = totalUp
+    private func updateSessionTotals() {
+        sessionDownloaded = downloads.reduce(Int64(0)) { $0 + $1.downloadedSize }
+        sessionUploaded = downloads.reduce(Int64(0)) { $0 + ($1.uploadedSize ?? 0) }
     }
 
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
-        let allNew = active + waiting + stopped
-        $downloads.withLock { $0 = IdentifiedArray(uniqueElements: allNew) }
+        downloads = IdentifiedArray(uniqueElements: active + waiting + stopped)
+        persistIfStructureChanged()
+    }
+
+    private func persistIfStructureChanged() {
+        var hasher = Hasher()
+        for download in downloads {
+            hasher.combine(download.id)
+            hasher.combine(download.status)
+        }
+        let signature = hasher.finalize()
+        guard signature != lastPersistedSignature else { return }
+        lastPersistedSignature = signature
+        $persistedDownloads.withLock { $0 = downloads }
     }
 
     deinit {
@@ -349,3 +401,35 @@ final class DownloadManager {
         updateTask?.cancel()
     }
 }
+
+#if DEBUG
+extension DownloadManager {
+    static func preview(downloads: [DownloadFile] = .sampleList) -> DownloadManager {
+        withDependencies {
+            $0.aria2Client = .previewValue
+        } operation: {
+            let manager = DownloadManager(startPolling: false)
+            manager.seedPreviewState(downloads: downloads)
+            return manager
+        }
+    }
+
+    private func seedPreviewState(downloads: [DownloadFile]) {
+        self.downloads = IdentifiedArray(uniqueElements: downloads)
+        connectionState = .connected
+        totalDownloadRate = downloads.compactMap(\.downloadSpeed).reduce(0, +)
+        totalUploadRate = downloads.compactMap(\.uploadSpeed).reduce(0, +)
+        sessionDownloaded = downloads.reduce(0) { $0 + $1.downloadedSize }
+        sessionUploaded = downloads.reduce(0) { $0 + ($1.uploadedSize ?? 0) }
+        downloadSpeedHistory = Self.sampleHistory(peak: Double(max(totalDownloadRate, 1_048_576)))
+        uploadSpeedHistory = Self.sampleHistory(peak: Double(max(totalUploadRate, 524_288)))
+    }
+
+    private static func sampleHistory(peak: Double) -> [Double] {
+        (0..<60).map { index in
+            let phase = Double(index) / 60 * .pi * 4
+            return peak * (0.45 + 0.4 * (sin(phase) * 0.5 + 0.5))
+        }
+    }
+}
+#endif

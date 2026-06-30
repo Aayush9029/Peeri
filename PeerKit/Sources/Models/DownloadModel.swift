@@ -18,6 +18,12 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var numSeeders: Int?
     public var uploadedSize: Int64?
     public var status: DownloadStatus
+    /// Hex piece-availability map from aria2 (each bit = one piece downloaded)
+    public var bitfield: String?
+    /// Total number of pieces this download is split into
+    public var numPieces: Int?
+    /// Size in bytes of a single piece
+    public var pieceLength: Int64?
 
     public init(
         id: ID = .init(UUID()),
@@ -32,7 +38,10 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         connections: Int? = nil,
         numSeeders: Int? = nil,
         uploadedSize: Int64? = nil,
-        status: DownloadStatus = .pending
+        status: DownloadStatus = .pending,
+        bitfield: String? = nil,
+        numPieces: Int? = nil,
+        pieceLength: Int64? = nil
     ) {
         self.id = id
         self.gid = gid
@@ -47,6 +56,9 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.numSeeders = numSeeders
         self.uploadedSize = uploadedSize
         self.status = status
+        self.bitfield = bitfield
+        self.numPieces = numPieces
+        self.pieceLength = pieceLength
     }
 
     public var progress: Double {
@@ -57,6 +69,11 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     /// Whether this is a torrent (has seeders info)
     public var isTorrent: Bool {
         numSeeders != nil
+    }
+
+    /// Whether aria2 has reported piece data for a piece-level grid
+    public var hasPieceData: Bool {
+        (numPieces ?? 0) > 0
     }
 
     /// Estimated time remaining in seconds, nil if unknown

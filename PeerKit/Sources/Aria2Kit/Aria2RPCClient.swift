@@ -294,6 +294,8 @@ actor Aria2RPCClient {
         let connections = status.connections.flatMap { Int($0) }
         let numSeeders = status.numSeeders.flatMap { Int($0) }
         let uploadedSize = status.uploadLength.flatMap { Int64($0) }
+        let numPieces = status.numPieces.flatMap { Int($0) }
+        let pieceLength = status.pieceLength.flatMap { Int64($0) }
 
         return DownloadFile(
             id: .deterministic(from: gid),
@@ -308,7 +310,10 @@ actor Aria2RPCClient {
             connections: connections,
             numSeeders: numSeeders,
             uploadedSize: uploadedSize,
-            status: downloadStatus
+            status: downloadStatus,
+            bitfield: status.bitfield,
+            numPieces: numPieces,
+            pieceLength: pieceLength
         )
     }
 

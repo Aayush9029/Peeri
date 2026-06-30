@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var selectedFilter: DownloadFilter = .all
     @State private var sidebarCollapsed = false
     @State private var statsCollapsed = false
+    @State private var detailDownload: DownloadFile?
 
     private var filteredDownloads: [DownloadFile] {
         selectedFilter.filter(downloadManager.downloads)
@@ -51,6 +52,10 @@ struct ContentView: View {
         .ignoresSafeArea()
         .sheet(isPresented: $showAddDownload) {
             AddDownloadView(isPresented: $showAddDownload, downloadManager: downloadManager)
+        }
+        .sheet(item: $detailDownload) { download in
+            DownloadDetailView(downloadID: download.id)
+                .environment(downloadManager)
         }
     }
 
@@ -141,7 +146,7 @@ struct ContentView: View {
 
     private var contentPanel: some View {
         VStack(spacing: 0) {
-            DownloadListView(downloads: filteredDownloads)
+            DownloadListView(downloads: filteredDownloads) { detailDownload = $0 }
 
             // Divider with toggle button
             ZStack {
