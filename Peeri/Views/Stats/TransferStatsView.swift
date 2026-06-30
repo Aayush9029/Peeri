@@ -9,65 +9,27 @@ struct TransferStatsView: View {
     let totalUploaded: Int64
     var allPaused: Bool = false
 
-    private var hasUploadActivity: Bool {
-        uploadHistory.contains { $0 > 0 }
-    }
-
     var body: some View {
-        HStack(alignment: .top) {
-            ZStack {
-                TransferChart(numbers: downloadHistory, tint: .blue)
-                if hasUploadActivity {
-                    TransferChart(numbers: uploadHistory, tint: .green)
-                }
-            }
-            .saturation(allPaused ? 0 : 1)
-            .opacity(allPaused ? 0.5 : 1)
-
-            VStack(alignment: .leading) {
-                Text("DOWNLOAD / UPLOAD PER SEC")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                HStack {
-                    HStack {
-                        Image(systemName: "arrow.down")
-                        Text(formattedDownloadRate)
-                    }
-                    Spacer()
-                    HStack {
-                        Image(systemName: "arrow.up")
-                        Text(formattedUploadRate)
-                    }
-                }
-                .font(.title.bold())
-                Spacer()
-                VStack(alignment: .leading, spacing: 32) {
-                    totalColumn("Total Downloaded", totalDownloaded)
-                    totalColumn("Total Uploaded", totalUploaded)
-                }
-                .font(.title)
-                Spacer()
-            }
-            .padding()
+        HStack(spacing: 12) {
+            TransferStatTile(
+                title: "Download",
+                systemImage: "arrow.down",
+                tint: .blue,
+                rate: downloadRate,
+                total: totalDownloaded,
+                history: downloadHistory,
+                dimmed: allPaused
+            )
+            TransferStatTile(
+                title: "Upload",
+                systemImage: "arrow.up",
+                tint: .green,
+                rate: uploadRate,
+                total: totalUploaded,
+                history: uploadHistory,
+                dimmed: allPaused
+            )
         }
-    }
-
-    private func totalColumn(_ label: String, _ bytes: Int64) -> some View {
-        VStack(alignment: .leading) {
-            Text(label)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .binary))
-        }
-    }
-
-    private var formattedDownloadRate: String {
-        ByteCountFormatter.string(fromByteCount: downloadRate, countStyle: .binary) + "/s"
-    }
-
-    private var formattedUploadRate: String {
-        ByteCountFormatter.string(fromByteCount: uploadRate, countStyle: .binary) + "/s"
     }
 }
 
@@ -80,7 +42,7 @@ struct TransferStatsView: View {
         totalDownloaded: 3_220_000_000,
         totalUploaded: 1_073_741_824
     )
-    .frame(width: 640, height: 320)
+    .frame(width: 680)
     .padding()
 }
 
@@ -94,6 +56,6 @@ struct TransferStatsView: View {
         totalUploaded: 0,
         allPaused: true
     )
-    .frame(width: 640, height: 320)
+    .frame(width: 680)
     .padding()
 }

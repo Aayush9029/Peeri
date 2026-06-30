@@ -27,8 +27,7 @@ struct DownloadStatsFooter: View {
                     totalUploaded: downloadManager.sessionUploaded,
                     allPaused: allPaused
                 )
-                .frame(height: 320)
-                .padding()
+                .padding([.horizontal, .bottom], 12)
                 .transition(.opacity)
             }
         }

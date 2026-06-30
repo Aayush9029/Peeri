@@ -7,6 +7,8 @@ actor Aria2RPCClient {
     private var baseURL: URL?
     private var token: String?
     private let session: URLSession
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
     private let logger = Logger(subsystem: "com.lovedoingthings.peeri", category: "Aria2RPCClient")
 
     init() {
@@ -29,7 +31,7 @@ actor Aria2RPCClient {
         guard let url = baseURL else { throw Aria2Error.notInitialized }
 
         let request = RPCRequest(method: method, params: params, token: token)
-        let bodyData = try JSONEncoder().encode(request)
+        let bodyData = try encoder.encode(request)
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -49,7 +51,7 @@ actor Aria2RPCClient {
 
         let rpcResponse: RPCResponse<T>
         do {
-            rpcResponse = try JSONDecoder().decode(RPCResponse<T>.self, from: data)
+            rpcResponse = try decoder.decode(RPCResponse<T>.self, from: data)
         } catch {
             throw Aria2Error.decodingError(error.localizedDescription)
         }

@@ -5,7 +5,6 @@ import SwiftUI
 struct SettingsView: View {
     @Shared(.settings) var settings
     @State private var selectedTab: SettingsTab = .general
-    @Environment(DownloadManager.self) var downloadManager
 
     enum SettingsTab {
         case general

@@ -26,24 +26,26 @@ struct ContentView: View {
             DownloadFilterSidebar(selection: $selectedFilter, downloads: downloadManager.downloads)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
-            VStack(spacing: 0) {
-                DownloadListView(downloads: filteredDownloads) { detailDownload = $0 }
-                DownloadStatsFooter(collapsed: $statsCollapsed, allPaused: allPaused)
-            }
-            .frame(minWidth: 560)
-            .navigationTitle("Peeri")
-            .toolbar {
-                ToolbarItem(placement: .status) {
+            DownloadTable(downloads: filteredDownloads) { detailDownload = $0 }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    DownloadStatsFooter(collapsed: $statsCollapsed, allPaused: allPaused)
+                }
+                .frame(minWidth: 560)
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 6) {
+                    Text("Peeri").font(.headline)
                     ConnectionStatusView(state: downloadManager.connectionState)
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        appUI.isAddDownloadPresented = true
-                    } label: {
-                        Label("Add Download", systemImage: "plus")
-                    }
-                    .help("Add Download (⌘N)")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    appUI.isAddDownloadPresented = true
+                } label: {
+                    Label("Add Download", systemImage: "plus")
                 }
+                .help("Add Download (⌘N)")
             }
         }
         .sheet(isPresented: $appUI.isAddDownloadPresented) {

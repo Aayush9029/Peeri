@@ -361,8 +361,8 @@ final class DownloadManager {
             if let speed = download.uploadSpeed { ulRate += speed }
         }
 
-        totalDownloadRate = dlRate
-        totalUploadRate = ulRate
+        if totalDownloadRate != dlRate { totalDownloadRate = dlRate }
+        if totalUploadRate != ulRate { totalUploadRate = ulRate }
 
         let hasActivity = dlRate > 0 || ulRate > 0
             || activeFiles.contains { $0.status == .downloading || $0.status == .seeding }
@@ -375,12 +375,16 @@ final class DownloadManager {
     }
 
     private func updateSessionTotals() {
-        sessionDownloaded = downloads.reduce(Int64(0)) { $0 + $1.downloadedSize }
-        sessionUploaded = downloads.reduce(Int64(0)) { $0 + ($1.uploadedSize ?? 0) }
+        let down = downloads.reduce(Int64(0)) { $0 + $1.downloadedSize }
+        let up = downloads.reduce(Int64(0)) { $0 + ($1.uploadedSize ?? 0) }
+        if sessionDownloaded != down { sessionDownloaded = down }
+        if sessionUploaded != up { sessionUploaded = up }
     }
 
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
-        downloads = IdentifiedArray(uniqueElements: active + waiting + stopped)
+        let newList = IdentifiedArray(uniqueElements: active + waiting + stopped)
+        guard newList != downloads else { return }
+        downloads = newList
         persistIfStructureChanged()
     }
 
