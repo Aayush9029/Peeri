@@ -6,17 +6,19 @@ import SwiftUI
 struct PeeriApp: App {
     @State private var downloadManager = DownloadManager()
     @State private var daemonManager = Aria2DaemonManager()
+    @State private var appUI = AppUIModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(downloadManager)
+                .environment(appUI)
         }
-        .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Add Download...") {
-                    addDownload()
+                Button("Add Download…") {
+                    appUI.isAddDownloadPresented = true
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
@@ -25,25 +27,6 @@ struct PeeriApp: App {
         Settings {
             SettingsView()
                 .environment(downloadManager)
-        }
-    }
-
-    private func addDownload() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.allowedContentTypes = [.text, .url]
-        panel.prompt = "Add URL"
-
-        panel.begin { response in
-            if response == .OK, let url = panel.url {
-                Task {
-                    if let fileContents = try? String(contentsOf: url), let downloadURL = URL(string: fileContents.trimmingCharacters(in: .whitespacesAndNewlines)) {
-                        await downloadManager.addDownload(url: downloadURL)
-                    }
-                }
-            }
         }
     }
 }

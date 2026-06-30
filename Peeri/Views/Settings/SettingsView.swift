@@ -40,5 +40,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
-        .environment(DownloadManager())
+        .environment(DownloadManager.preview())
 }
