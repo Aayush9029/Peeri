@@ -52,7 +52,9 @@ struct SettingsView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     SettingsView()
         .environment(DownloadManager.preview())
 }
+#endif

@@ -105,6 +105,7 @@ struct DownloadTable: View {
     }
 }
 
+#if DEBUG
 #Preview("Populated") {
     DownloadTable(
         downloads: .sampleList,
@@ -124,3 +125,4 @@ struct DownloadTable: View {
         .environment(DownloadManager.preview(downloads: []))
         .frame(width: 860, height: 420)
 }
+#endif

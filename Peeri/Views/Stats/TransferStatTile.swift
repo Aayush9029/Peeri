@@ -37,6 +37,7 @@ struct TransferStatTile: View {
     }
 }
 
+#if DEBUG
 #Preview {
     HStack(spacing: 12) {
         TransferStatTile(
@@ -59,3 +60,4 @@ struct TransferStatTile: View {
     .frame(width: 640)
     .padding()
 }
+#endif

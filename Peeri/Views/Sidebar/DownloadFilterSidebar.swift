@@ -20,6 +20,7 @@ struct DownloadFilterSidebar: View {
     }
 }
 
+#if DEBUG
 #Preview {
     DownloadFilterSidebar(
         selection: .constant(.all),
@@ -27,3 +28,4 @@ struct DownloadFilterSidebar: View {
     )
     .frame(width: 240, height: 420)
 }
+#endif

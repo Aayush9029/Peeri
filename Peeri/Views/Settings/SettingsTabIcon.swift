@@ -17,6 +17,7 @@ struct SettingsTabIcon: View {
     }
 }
 
+#if DEBUG
 #Preview {
     VStack(alignment: .leading) {
         ForEach(SettingsTab.allCases, id: \.self) { tab in
@@ -25,3 +26,4 @@ struct SettingsTabIcon: View {
     }
     .padding()
 }
+#endif

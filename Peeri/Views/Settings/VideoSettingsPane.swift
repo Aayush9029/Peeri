@@ -89,6 +89,8 @@ private extension VideoFormatPreference {
     }
 }
 
+#if DEBUG
 #Preview {
     VideoSettingsPane()
 }
+#endif

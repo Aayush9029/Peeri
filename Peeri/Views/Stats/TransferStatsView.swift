@@ -33,6 +33,7 @@ struct TransferStatsView: View {
     }
 }
 
+#if DEBUG
 #Preview("Active") {
     TransferStatsView(
         downloadRate: 15_728_640,
@@ -59,3 +60,4 @@ struct TransferStatsView: View {
     .frame(width: 680)
     .padding()
 }
+#endif

@@ -67,6 +67,7 @@ struct DownloadArtworkView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     HStack(spacing: 12) {
         DownloadArtworkView(download: .sampleDownloading)
@@ -75,3 +76,4 @@ struct DownloadArtworkView: View {
     }
     .padding()
 }
+#endif

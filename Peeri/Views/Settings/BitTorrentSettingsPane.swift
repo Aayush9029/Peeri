@@ -30,6 +30,8 @@ struct BitTorrentSettingsPane: View {
     }
 }
 
+#if DEBUG
 #Preview {
     BitTorrentSettingsPane()
 }
+#endif

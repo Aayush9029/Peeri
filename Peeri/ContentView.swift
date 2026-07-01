@@ -135,9 +135,11 @@ struct ContentView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ContentView()
         .environment(DownloadManager.preview())
         .environment(AppUIModel())
         .frame(width: 900, height: 600)
 }
+#endif

@@ -72,6 +72,7 @@ struct PieceGridView: View {
     }
 }
 
+#if DEBUG
 #Preview("Partial") {
     PieceGridView(bitfield: "ffffff00ff00ff0000", numPieces: 72)
         .padding()
@@ -86,3 +87,4 @@ struct PieceGridView: View {
     .padding()
     .frame(width: 420)
 }
+#endif

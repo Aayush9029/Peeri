@@ -39,6 +39,7 @@ struct TransferChart: View {
     }
 }
 
+#if DEBUG
 #Preview {
     TransferChart(
         samples: (0..<60).map { 1_000_000 * (1 + sin(Double($0) / 6)) },
@@ -47,3 +48,4 @@ struct TransferChart: View {
     .frame(width: 320, height: 80)
     .padding()
 }
+#endif

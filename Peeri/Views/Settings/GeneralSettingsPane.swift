@@ -96,6 +96,8 @@ struct GeneralSettingsPane: View {
     }
 }
 
+#if DEBUG
 #Preview {
     GeneralSettingsPane()
 }
+#endif

@@ -295,7 +295,9 @@ struct AddDownloadView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     AddDownloadView()
         .environment(DownloadManager.preview())
 }
+#endif

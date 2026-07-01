@@ -10,6 +10,7 @@ struct DownloadStatusIcon: View {
     }
 }
 
+#if DEBUG
 #Preview {
     HStack(spacing: 16) {
         ForEach(
@@ -22,3 +23,4 @@ struct DownloadStatusIcon: View {
     .font(.title2)
     .padding()
 }
+#endif

@@ -322,13 +322,13 @@ final class DownloadManager {
     }
 
     func openDownload(_ download: DownloadFile) {
-        withResolvedFileURL(for: download) { url in
+        _ = withResolvedFileURL(for: download) { url in
             NSWorkspace.shared.open(url)
         }
     }
 
     func showInFinder(_ download: DownloadFile) {
-        withResolvedFileURL(for: download) { url in
+        _ = withResolvedFileURL(for: download) { url in
             NSWorkspace.shared.activateFileViewerSelecting([url])
         }
     }
@@ -338,7 +338,7 @@ final class DownloadManager {
     }
 
     func copyFilePath(_ download: DownloadFile) {
-        withResolvedFileURL(for: download) { url in
+        _ = withResolvedFileURL(for: download) { url in
             copyToPasteboard(url.path)
         }
     }

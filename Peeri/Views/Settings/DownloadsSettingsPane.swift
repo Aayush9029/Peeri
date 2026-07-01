@@ -105,6 +105,8 @@ struct DownloadsSettingsPane: View {
     }
 }
 
+#if DEBUG
 #Preview {
     DownloadsSettingsPane()
 }
+#endif

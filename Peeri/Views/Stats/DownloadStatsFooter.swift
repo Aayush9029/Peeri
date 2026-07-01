@@ -63,8 +63,10 @@ struct DownloadStatsFooter: View {
     }
 }
 
+#if DEBUG
 #Preview {
     DownloadStatsFooter(allPaused: false)
         .environment(DownloadManager.preview())
         .frame(width: 700)
 }
+#endif

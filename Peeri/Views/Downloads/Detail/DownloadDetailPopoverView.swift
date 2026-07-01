@@ -197,6 +197,7 @@ struct DownloadDetailPopoverView: View {
     }
 }
 
+#if DEBUG
 #Preview("Video") {
     DownloadDetailPopoverView(downloadID: DownloadFile.sampleDownloading.id)
         .environment(DownloadManager.preview())
@@ -206,3 +207,4 @@ struct DownloadDetailPopoverView: View {
     DownloadDetailPopoverView(downloadID: DownloadFile.sampleTorrent.id)
         .environment(DownloadManager.preview())
 }
+#endif

@@ -92,6 +92,7 @@ private struct MiniProgressBar: View {
     }
 }
 
+#if DEBUG
 #Preview {
     VStack(spacing: 6) {
         PeerRow(peer: .preview(ip: "192.168.1.42", seeder: true, progress: 1.0))
@@ -100,3 +101,4 @@ private struct MiniProgressBar: View {
     .padding()
     .frame(width: 560)
 }
+#endif

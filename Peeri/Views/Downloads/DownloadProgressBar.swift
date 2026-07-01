@@ -61,6 +61,7 @@ struct DownloadProgressBar: View {
     }
 }
 
+#if DEBUG
 #Preview {
     VStack(spacing: 16) {
         DownloadProgressBar(progress: 0.6, status: .downloading)
@@ -70,3 +71,4 @@ struct DownloadProgressBar: View {
     .frame(width: 220)
     .padding()
 }
+#endif
