@@ -51,12 +51,16 @@ final class DownloadManager {
     }
 
     @ObservationIgnored @Shared(.downloads) private var persistedDownloads
+    @ObservationIgnored @Shared(.settings) private var settings
     @ObservationIgnored @Dependency(\.aria2Client) private var aria2Client
 
     @ObservationIgnored private var connectionTask: Task<Void, Never>?
     @ObservationIgnored private var updateTask: Task<Void, Never>?
+    @ObservationIgnored private var videoDownloadTasks: [DownloadFile.ID: Task<Void, Never>] = [:]
     @ObservationIgnored private var lastPersistedSignature = 0
 
+    private let ytdlpClient = YTDLPClient()
+    private let ytdlpGIDPrefix = "yt-dlp:"
     private let aria2Host = "localhost"
     private let aria2Port: UInt16 = 16800
     private let aria2Token = "peeri"
@@ -181,10 +185,18 @@ final class DownloadManager {
     // MARK: - Download Actions
 
     func addDownload(url: URL) async {
+        if ytdlpClient.canHandle(url) {
+            startVideoDownload(url: url)
+            return
+        }
+
         do {
-            let downloadDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!.path
+            let directory = DownloadDirectoryAccess(settings: settings)
+            let didStartAccessing = directory.startAccessing()
+            defer { directory.stopAccessing(didStartAccessing) }
+
             let options: [String: String] = [
-                "dir": downloadDir,
+                "dir": directory.url.path,
                 "out": url.lastPathComponent.isEmpty ? "download" : url.lastPathComponent
             ]
 
@@ -205,9 +217,11 @@ final class DownloadManager {
     func addTorrent(fileURL: URL) async {
         do {
             let base64 = try Data(contentsOf: fileURL).base64EncodedString()
-            let downloadDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!.path
+            let directory = DownloadDirectoryAccess(settings: settings)
+            let didStartAccessing = directory.startAccessing()
+            defer { directory.stopAccessing(didStartAccessing) }
 
-            let gid = try await aria2Client.addTorrent(base64, [], ["dir": downloadDir])
+            let gid = try await aria2Client.addTorrent(base64, [], ["dir": directory.url.path])
             logger.info("Added torrent with GID: \(gid)")
             await updateDownloads()
         } catch {
@@ -217,6 +231,8 @@ final class DownloadManager {
     }
 
     func pauseDownload(_ download: DownloadFile) async {
+        guard !isYTDLPDownload(download) else { return }
+
         do {
             guard try await aria2Client.pause(download.gid) else { return }
             downloads[id: download.id]?.status = .paused
@@ -229,6 +245,8 @@ final class DownloadManager {
     }
 
     func resumeDownload(_ download: DownloadFile) async {
+        guard !isYTDLPDownload(download) else { return }
+
         do {
             guard try await aria2Client.unpause(download.gid) else { return }
             downloads[id: download.id]?.status = .downloading
@@ -241,6 +259,16 @@ final class DownloadManager {
     }
 
     func cancelDownload(_ download: DownloadFile) async {
+        if isYTDLPDownload(download) {
+            videoDownloadTasks[download.id]?.cancel()
+            videoDownloadTasks[download.id] = nil
+            downloads.remove(id: download.id)
+            refreshCurrentRates()
+            persistIfStructureChanged()
+            logger.info("Video download canceled: \(download.fileName)")
+            return
+        }
+
         do {
             guard try await aria2Client.remove(download.gid) else { return }
             downloads.remove(id: download.id)
@@ -253,7 +281,12 @@ final class DownloadManager {
     }
 
     func removeDownload(_ download: DownloadFile) {
+        if isYTDLPDownload(download) {
+            videoDownloadTasks[download.id]?.cancel()
+            videoDownloadTasks[download.id] = nil
+        }
         downloads.remove(id: download.id)
+        refreshCurrentRates()
         persistIfStructureChanged()
         logger.info("Download removed from list: \(download.fileName)")
     }
@@ -288,8 +321,8 @@ final class DownloadManager {
         if let filePath = download.filePath {
             NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
         } else {
-            let downloadDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-            let url = downloadDir.appendingPathComponent(download.fileName)
+            let directory = DownloadDirectoryAccess(settings: settings)
+            let url = directory.url.appendingPathComponent(download.fileName)
             if FileManager.default.fileExists(atPath: url.path) {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             }
@@ -356,7 +389,9 @@ final class DownloadManager {
     private func updateStatistics(_ activeFiles: [DownloadFile]) {
         var dlRate: Int64 = 0
         var ulRate: Int64 = 0
-        for download in activeFiles {
+        let activeTransfers = activeFiles + activeYTDLPDownloads()
+
+        for download in activeTransfers {
             if let speed = download.downloadSpeed { dlRate += speed }
             if let speed = download.uploadSpeed { ulRate += speed }
         }
@@ -365,7 +400,7 @@ final class DownloadManager {
         if totalUploadRate != ulRate { totalUploadRate = ulRate }
 
         let hasActivity = dlRate > 0 || ulRate > 0
-            || activeFiles.contains { $0.status == .downloading || $0.status == .seeding }
+            || activeTransfers.contains { $0.status == .downloading || $0.status == .seeding }
 
         guard hasActivity else { return }
         downloadSpeedHistory.append(Double(dlRate))
@@ -382,10 +417,137 @@ final class DownloadManager {
     }
 
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
-        let newList = IdentifiedArray(uniqueElements: active + waiting + stopped)
+        let videoDownloads = Array(downloads.filter(isYTDLPDownload))
+        let newList = IdentifiedArray(uniqueElements: videoDownloads + active + waiting + stopped)
         guard newList != downloads else { return }
         downloads = newList
         persistIfStructureChanged()
+    }
+
+    private func startVideoDownload(url: URL) {
+        let id = DownloadFile.ID(UUID())
+        let gid = ytdlpGIDPrefix + UUID().uuidString
+        let initialName = url.host(percentEncoded: false) ?? "Video Download"
+
+        downloads[id: id] = DownloadFile(
+            id: id,
+            gid: gid,
+            url: url,
+            fileName: initialName,
+            status: .pending
+        )
+        persistIfStructureChanged()
+
+        videoDownloadTasks[id]?.cancel()
+        videoDownloadTasks[id] = Task { [weak self] in
+            await self?.runVideoDownload(id: id, url: url, initialName: initialName)
+        }
+    }
+
+    private func runVideoDownload(id: DownloadFile.ID, url: URL, initialName: String) async {
+        let directory = DownloadDirectoryAccess(settings: settings)
+        let didStartAccessing = directory.startAccessing()
+        defer {
+            directory.stopAccessing(didStartAccessing)
+            videoDownloadTasks[id] = nil
+        }
+
+        do {
+            if let metadata = try? await ytdlpClient.metadata(for: url) {
+                try Task.checkCancellation()
+                downloads[id: id]?.fileName = metadata.title ?? initialName
+                downloads[id: id]?.thumbnailURL = metadata.thumbnailURL
+                downloads[id: id]?.status = .downloading
+                persistIfStructureChanged()
+            } else {
+                downloads[id: id]?.status = .downloading
+            }
+
+            try Task.checkCancellation()
+
+            let result = try await ytdlpClient.download(
+                url: url,
+                to: directory.url,
+                formatPreference: settings.videoFormatPreference
+            ) { [weak self] progress in
+                await MainActor.run { [weak self] in
+                    self?.updateVideoDownload(id: id, progress: progress)
+                }
+            }
+
+            try Task.checkCancellation()
+
+            if let outputURL = result.outputURL {
+                let attributes = try? FileManager.default.attributesOfItem(atPath: outputURL.path)
+                let size = (attributes?[.size] as? NSNumber)?.int64Value
+                downloads[id: id]?.fileName = outputURL.lastPathComponent
+                downloads[id: id]?.filePath = outputURL.path
+                downloads[id: id]?.fileSize = size
+                downloads[id: id]?.downloadedSize = size ?? downloads[id: id]?.downloadedSize ?? 0
+            }
+            downloads[id: id]?.progressFraction = 1
+            downloads[id: id]?.downloadSpeed = 0
+            downloads[id: id]?.status = .completed
+            refreshCurrentRates()
+            persistIfStructureChanged()
+        } catch is CancellationError {
+            downloads.remove(id: id)
+            refreshCurrentRates()
+            persistIfStructureChanged()
+        } catch {
+            logger.error("Failed to add video download: \(error.localizedDescription)")
+            downloads[id: id]?.status = .failed
+            downloads[id: id]?.downloadSpeed = 0
+            refreshCurrentRates()
+            lastError = "Failed to download video: \(error.localizedDescription)"
+            persistIfStructureChanged()
+        }
+    }
+
+    private func updateVideoDownload(id: DownloadFile.ID, progress: YTDLPProgress) {
+        guard downloads[id: id] != nil else { return }
+
+        if let totalBytes = progress.totalBytes, totalBytes > 0 {
+            let currentSize = downloads[id: id]?.fileSize ?? 0
+            if progress.status == "finished" || totalBytes > currentSize {
+                downloads[id: id]?.fileSize = totalBytes
+            }
+        }
+
+        if let downloadedBytes = progress.downloadedBytes {
+            downloads[id: id]?.downloadedSize = downloadedBytes
+        } else if
+            let fraction = progress.fraction,
+            let fileSize = downloads[id: id]?.fileSize
+        {
+            downloads[id: id]?.downloadedSize = Int64(Double(fileSize) * fraction)
+        }
+
+        if let fraction = progress.fraction {
+            let currentFraction = downloads[id: id]?.progressFraction ?? 0
+            downloads[id: id]?.progressFraction = max(currentFraction, fraction)
+        }
+        downloads[id: id]?.downloadSpeed = progress.speed ?? downloads[id: id]?.downloadSpeed
+        downloads[id: id]?.status = .downloading
+        refreshCurrentRates()
+        updateSessionTotals()
+        persistIfStructureChanged()
+    }
+
+    private func activeYTDLPDownloads() -> [DownloadFile] {
+        downloads.filter { isYTDLPDownload($0) && $0.status == .downloading }
+    }
+
+    private func refreshCurrentRates() {
+        let activeTransfers = downloads.filter { $0.status == .downloading || $0.status == .seeding }
+        let dlRate = activeTransfers.compactMap(\.downloadSpeed).reduce(0, +)
+        let ulRate = activeTransfers.compactMap(\.uploadSpeed).reduce(0, +)
+        if totalDownloadRate != dlRate { totalDownloadRate = dlRate }
+        if totalUploadRate != ulRate { totalUploadRate = ulRate }
+    }
+
+    private func isYTDLPDownload(_ download: DownloadFile) -> Bool {
+        download.gid.hasPrefix(ytdlpGIDPrefix)
     }
 
     private func persistIfStructureChanged() {
@@ -393,6 +555,13 @@ final class DownloadManager {
         for download in downloads {
             hasher.combine(download.id)
             hasher.combine(download.status)
+            hasher.combine(download.fileName)
+            hasher.combine(download.filePath)
+            hasher.combine(download.fileSize)
+            hasher.combine(download.downloadedSize)
+            hasher.combine(download.progressFraction)
+            hasher.combine(download.downloadSpeed)
+            hasher.combine(download.thumbnailURL)
         }
         let signature = hasher.finalize()
         guard signature != lastPersistedSignature else { return }
@@ -403,6 +572,7 @@ final class DownloadManager {
     deinit {
         connectionTask?.cancel()
         updateTask?.cancel()
+        videoDownloadTasks.values.forEach { $0.cancel() }
     }
 }
 

@@ -99,6 +99,8 @@ final class Aria2DaemonManager {
         let logPath = "\(logsDir)/aria2c.log"
         let configPath = "\(aria2Dir)/aria2.conf"
         let configContent = settings.toAria2ConfigString(logPath: logPath)
+        let downloadDirectory = DownloadDirectoryAccess(settings: settings)
+        let didStartAccessing = downloadDirectory.startAccessing()
 
         do {
             try configContent.write(toFile: configPath, atomically: true, encoding: .utf8)
@@ -108,7 +110,13 @@ final class Aria2DaemonManager {
         }
 
         killExistingProcesses()
-        launchProcess(executablePath: aria2cPath, configPath: configPath, logPath: logPath)
+        launchProcess(
+            executablePath: aria2cPath,
+            configPath: configPath,
+            logPath: logPath,
+            downloadDirectory: downloadDirectory,
+            didStartAccessingDownloadDirectory: didStartAccessing
+        )
     }
 
     private func killExistingProcesses() {
@@ -124,7 +132,13 @@ final class Aria2DaemonManager {
         }
     }
 
-    private func launchProcess(executablePath: String, configPath: String, logPath: String) {
+    private func launchProcess(
+        executablePath: String,
+        configPath: String,
+        logPath: String,
+        downloadDirectory: DownloadDirectoryAccess? = nil,
+        didStartAccessingDownloadDirectory: Bool = false
+    ) {
         logger.info("Launching aria2c at \(executablePath)")
 
         do {
@@ -153,13 +167,21 @@ final class Aria2DaemonManager {
                     if process.terminationStatus != 0 && process.terminationStatus != 15 {
                         self.logger.warning("Unexpected termination — restarting aria2c in 2s…")
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            self.launchProcess(executablePath: executablePath, configPath: configPath, logPath: logPath)
+                            let didStartAccessing = downloadDirectory?.startAccessing() ?? false
+                            self.launchProcess(
+                                executablePath: executablePath,
+                                configPath: configPath,
+                                logPath: logPath,
+                                downloadDirectory: downloadDirectory,
+                                didStartAccessingDownloadDirectory: didStartAccessing
+                            )
                         }
                     }
                 }
 
                 try task.run()
                 self.logger.info("aria2c started (PID \(task.processIdentifier))")
+                downloadDirectory?.stopAccessing(didStartAccessingDownloadDirectory)
 
                 DispatchQueue.main.async {
                     self.aria2Process = task
@@ -179,6 +201,7 @@ final class Aria2DaemonManager {
                     }
                 }
             } catch {
+                downloadDirectory?.stopAccessing(didStartAccessingDownloadDirectory)
                 self.logger.critical("Failed to start aria2c: \(error.localizedDescription)")
                 fatalError("Failed to start aria2c process: \(error)")
             }

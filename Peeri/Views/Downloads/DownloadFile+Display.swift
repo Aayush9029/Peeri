@@ -2,6 +2,10 @@ import Foundation
 import Models
 
 extension DownloadFile {
+    var isVideoDownload: Bool {
+        gid.hasPrefix("yt-dlp:")
+    }
+
     var displaySize: String {
         if let fileSize, fileSize > 0 {
             return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)

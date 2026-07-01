@@ -5,32 +5,8 @@ struct DownloadStatusIcon: View {
     let status: DownloadStatus
 
     var body: some View {
-        Image(systemName: symbol)
-            .foregroundStyle(color)
-    }
-
-    private var symbol: String {
-        switch status {
-        case .downloading: "arrow.down"
-        case .paused: "pause"
-        case .completed: "checkmark.circle"
-        case .pending: "clock"
-        case .failed: "exclamationmark.triangle"
-        case .seeding: "arrow.up"
-        case .removed: "trash"
-        }
-    }
-
-    private var color: Color {
-        switch status {
-        case .downloading: .blue
-        case .paused: .gray
-        case .completed: .green
-        case .pending: .orange
-        case .failed: .red
-        case .seeding: .teal
-        case .removed: .gray
-        }
+        Image(systemName: status.symbol)
+            .foregroundStyle(status.tint)
     }
 }
 

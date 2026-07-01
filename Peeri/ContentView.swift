@@ -7,8 +7,6 @@ struct ContentView: View {
     @Environment(AppUIModel.self) private var appUI
 
     @State private var selectedFilter: DownloadFilter? = .all
-    @State private var statsCollapsed = false
-    @State private var detailDownload: DownloadFile?
 
     private var filteredDownloads: [DownloadFile] {
         (selectedFilter ?? .all).filter(downloadManager.downloads)
@@ -26,19 +24,13 @@ struct ContentView: View {
             DownloadFilterSidebar(selection: $selectedFilter, downloads: downloadManager.downloads)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
         } detail: {
-            DownloadTable(downloads: filteredDownloads) { detailDownload = $0 }
+            DownloadTable(downloads: filteredDownloads)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    DownloadStatsFooter(collapsed: $statsCollapsed, allPaused: allPaused)
+                    DownloadStatsFooter(allPaused: allPaused)
                 }
                 .frame(minWidth: 560)
         }
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 6) {
-                    Text("Peeri").font(.headline)
-                    ConnectionStatusView(state: downloadManager.connectionState)
-                }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     appUI.isAddDownloadPresented = true
@@ -50,10 +42,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $appUI.isAddDownloadPresented) {
             AddDownloadView()
-                .environment(downloadManager)
-        }
-        .sheet(item: $detailDownload) { download in
-            DownloadDetailView(downloadID: download.id)
                 .environment(downloadManager)
         }
     }

@@ -12,11 +12,13 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var filePath: String?
     public var fileSize: Int64?
     public var downloadedSize: Int64
+    public var progressFraction: Double?
     public var downloadSpeed: Int64?
     public var uploadSpeed: Int64?
     public var connections: Int?
     public var numSeeders: Int?
     public var uploadedSize: Int64?
+    public var thumbnailURL: URL?
     public var status: DownloadStatus
     /// Hex piece-availability map from aria2 (each bit = one piece downloaded)
     public var bitfield: String?
@@ -33,11 +35,13 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         filePath: String? = nil,
         fileSize: Int64? = nil,
         downloadedSize: Int64 = 0,
+        progressFraction: Double? = nil,
         downloadSpeed: Int64? = nil,
         uploadSpeed: Int64? = nil,
         connections: Int? = nil,
         numSeeders: Int? = nil,
         uploadedSize: Int64? = nil,
+        thumbnailURL: URL? = nil,
         status: DownloadStatus = .pending,
         bitfield: String? = nil,
         numPieces: Int? = nil,
@@ -50,11 +54,13 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.filePath = filePath
         self.fileSize = fileSize
         self.downloadedSize = downloadedSize
+        self.progressFraction = progressFraction
         self.downloadSpeed = downloadSpeed
         self.uploadSpeed = uploadSpeed
         self.connections = connections
         self.numSeeders = numSeeders
         self.uploadedSize = uploadedSize
+        self.thumbnailURL = thumbnailURL
         self.status = status
         self.bitfield = bitfield
         self.numPieces = numPieces
@@ -62,6 +68,12 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     }
 
     public var progress: Double {
+        if let progressFraction {
+            return min(max(progressFraction, 0), 1)
+        }
+        if status == .completed || status == .seeding {
+            return 1
+        }
         guard let fileSize = fileSize, fileSize > 0 else { return 0 }
         return Double(downloadedSize) / Double(fileSize)
     }

@@ -7,10 +7,12 @@ struct DownloadActionsMenu: View {
     @Environment(DownloadManager.self) private var downloadManager
 
     var body: some View {
-        Button(action: onShowDetails) { Label("Show Details", systemImage: "rectangle.grid.3x3") }
+        Button(action: onShowDetails) { Label("Show Details", systemImage: "info.circle") }
         Divider()
 
         switch download.status {
+        case .downloading where download.isVideoDownload:
+            cancelItem
         case .downloading:
             Button { Task { await downloadManager.pauseDownload(download) } } label: { Label("Pause", systemImage: "pause.fill") }
             finderItem
@@ -25,14 +27,14 @@ struct DownloadActionsMenu: View {
                 Button { downloadManager.copyFilePath(download) } label: { Label("Copy File Path", systemImage: "doc.on.doc") }
             }
             Divider()
-            removeItem(title: "Remove from List")
+            removeItem()
         case .failed:
             Button { Task { await downloadManager.retryDownload(download) } } label: { Label("Retry", systemImage: "arrow.clockwise") }
-            removeItem(title: "Remove from List")
+            removeItem()
         case .pending:
             cancelItem
         case .removed:
-            removeItem(title: "Remove from List")
+            removeItem()
         }
 
         Divider()
@@ -47,7 +49,7 @@ struct DownloadActionsMenu: View {
         Button(role: .destructive) { Task { await downloadManager.cancelDownload(download) } } label: { Label("Cancel", systemImage: "xmark.circle") }
     }
 
-    private func removeItem(title: String) -> some View {
-        Button(role: .destructive) { downloadManager.removeDownload(download) } label: { Label(title, systemImage: "trash") }
+    private func removeItem() -> some View {
+        Button(role: .destructive) { downloadManager.removeDownload(download) } label: { Label("Remove Download", systemImage: "trash") }
     }
 }

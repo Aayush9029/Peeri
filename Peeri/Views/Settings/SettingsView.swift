@@ -3,37 +3,56 @@ import Shared
 import SwiftUI
 
 struct SettingsView: View {
-    @Shared(.settings) var settings
-    @State private var selectedTab: SettingsTab = .general
+    @Environment(DownloadManager.self) private var downloadManager
 
-    enum SettingsTab {
-        case general
-        case downloads
-        case bitTorrent
-    }
+    @Shared(.settings) private var settings
+    @State private var selectedTab: SettingsTab = .general
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            GeneralSettingsTab()
-                .tabItem {
-                    Label("General", systemImage: "gear")
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            List(selection: sidebarSelection) {
+                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                    HStack(spacing: 10) {
+                        SettingsTabIcon(tab: tab, size: 20)
+                        Text(tab.title)
+                    }
+                    .tag(tab)
                 }
-                .tag(SettingsTab.general)
-
-            DownloadsSettingsTab()
-                .tabItem {
-                    Label("Downloads", systemImage: "arrow.down.circle")
-                }
-                .tag(SettingsTab.downloads)
-
-            BitTorrentSettingsTab()
-                .tabItem {
-                    Label("BitTorrent", systemImage: "network")
-                }
-                .tag(SettingsTab.bitTorrent)
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 240)
+        } detail: {
+            VStack(spacing: 0) {
+                SettingsPaneHeader(tab: selectedTab)
+                Divider()
+                pane
+            }
+            .navigationTitle(selectedTab.title)
         }
-        .frame(minWidth: 500, minHeight: 400)
-        .padding()
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 740, minHeight: 560)
+        .onChange(of: settings) { _, newSettings in
+            Task { await downloadManager.applySettings(newSettings) }
+        }
+    }
+
+    private var sidebarSelection: Binding<SettingsTab?> {
+        Binding(get: { selectedTab }, set: { selectedTab = $0 ?? selectedTab })
+    }
+
+    @ViewBuilder
+    private var pane: some View {
+        switch selectedTab {
+        case .general:
+            GeneralSettingsPane()
+        case .downloads:
+            DownloadsSettingsPane()
+        case .bitTorrent:
+            BitTorrentSettingsPane()
+        case .video:
+            VideoSettingsPane()
+        }
     }
 }
 

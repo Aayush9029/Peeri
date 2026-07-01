@@ -1,13 +1,11 @@
 {
-  "fill" : {
-    "automatic-gradient" : "display-p3:0.14285,0.25125,0.37049,1.00000"
-  },
+  "fill" : "system-dark",
   "groups" : [
     {
       "layers" : [
         {
           "blend-mode" : "normal",
-          "glass" : false,
+          "glass" : true,
           "hidden" : false,
           "image-name" : "icon_512x512@2x.png",
           "name" : "icon_512x512@2x",

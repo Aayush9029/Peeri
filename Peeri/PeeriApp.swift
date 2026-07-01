@@ -17,8 +17,10 @@ struct PeeriApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Add Download…") {
+                Button {
                     appUI.isAddDownloadPresented = true
+                } label: {
+                    Label("Add Download…", systemImage: "plus")
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }

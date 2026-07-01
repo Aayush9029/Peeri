@@ -14,10 +14,10 @@ struct PeerRow: View {
                 .font(.callout.monospaced())
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(minWidth: 120, alignment: .leading)
+                .frame(minWidth: 92, alignment: .leading)
 
             MiniProgressBar(progress: peer.progress, tint: peer.isSeeder ? .green : .blue)
-                .frame(width: 70)
+                .frame(width: 52)
 
             Text(percentText)
                 .font(.caption.monospacedDigit())
@@ -34,7 +34,7 @@ struct PeerRow: View {
             }
             .font(.caption.monospacedDigit())
             .foregroundStyle(peer.downloadSpeed > 0 ? .primary : .secondary)
-            .frame(width: 90, alignment: .trailing)
+            .frame(width: 74, alignment: .trailing)
 
             HStack(spacing: 4) {
                 Image(systemName: "arrow.up")
@@ -42,7 +42,7 @@ struct PeerRow: View {
             }
             .font(.caption.monospacedDigit())
             .foregroundStyle(peer.uploadSpeed > 0 ? .primary : .secondary)
-            .frame(width: 90, alignment: .trailing)
+            .frame(width: 74, alignment: .trailing)
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 10)

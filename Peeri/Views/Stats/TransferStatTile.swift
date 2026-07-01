@@ -18,12 +18,12 @@ struct TransferStatTile: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("Total " + ByteCountFormatter.string(fromByteCount: total, countStyle: .binary))
+                Text("Total " + ByteCountFormatter.peeri(total))
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.tertiary)
             }
 
-            Text(ByteCountFormatter.string(fromByteCount: rate, countStyle: .binary) + "/s")
+            Text(ByteCountFormatter.peeri(rate) + "/s")
                 .font(.title2.weight(.semibold).monospacedDigit())
 
             TransferChart(samples: history, tint: tint)

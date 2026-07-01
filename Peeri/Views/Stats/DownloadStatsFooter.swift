@@ -2,58 +2,69 @@ import SwiftUI
 
 struct DownloadStatsFooter: View {
     @Environment(DownloadManager.self) private var downloadManager
-    @Binding var collapsed: Bool
     let allPaused: Bool
+    @State private var showingCharts = false
 
     var body: some View {
         VStack(spacing: 0) {
-            collapseToggle
+            Divider()
+            HStack(spacing: 14) {
+                rate(systemImage: "arrow.down", tint: .blue, bytes: downloadManager.totalDownloadRate)
+                rate(systemImage: "arrow.up", tint: .green, bytes: downloadManager.totalUploadRate)
 
-            if collapsed {
-                CompactStatsBar(
-                    downloadRate: downloadManager.totalDownloadRate,
-                    uploadRate: downloadManager.totalUploadRate,
-                    totalDownloaded: downloadManager.sessionDownloaded,
-                    totalUploaded: downloadManager.sessionUploaded
-                )
-                .transition(.opacity)
-            } else {
-                TransferStatsView(
-                    downloadRate: downloadManager.totalDownloadRate,
-                    uploadRate: downloadManager.totalUploadRate,
-                    downloadHistory: downloadManager.downloadSpeedHistory,
-                    uploadHistory: downloadManager.uploadSpeedHistory,
-                    totalDownloaded: downloadManager.sessionDownloaded,
-                    totalUploaded: downloadManager.sessionUploaded,
-                    allPaused: allPaused
-                )
-                .padding([.horizontal, .bottom], 12)
-                .transition(.opacity)
+                Spacer()
+
+                total("DL", downloadManager.sessionDownloaded)
+                total("UL", downloadManager.sessionUploaded)
+
+                chartsButton
             }
+            .font(.callout)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+        }
+        .background(.bar)
+        .opacity(allPaused ? 0.6 : 1)
+    }
+
+    private var chartsButton: some View {
+        Button { showingCharts.toggle() } label: {
+            Image(systemName: "chart.xyaxis.line")
+        }
+        .buttonStyle(.borderless)
+        .help("Transfer Activity")
+        .popover(isPresented: $showingCharts, arrowEdge: .bottom) {
+            TransferStatsView(
+                downloadRate: downloadManager.totalDownloadRate,
+                uploadRate: downloadManager.totalUploadRate,
+                downloadHistory: downloadManager.downloadSpeedHistory,
+                uploadHistory: downloadManager.uploadSpeedHistory,
+                totalDownloaded: downloadManager.sessionDownloaded,
+                totalUploaded: downloadManager.sessionUploaded,
+                allPaused: allPaused
+            )
+            .frame(width: 460)
+            .padding()
         }
     }
 
-    private var collapseToggle: some View {
-        ZStack {
-            Divider()
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) { collapsed.toggle() }
-            } label: {
-                Image(systemName: collapsed ? "chevron.up" : "chevron.down")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 16)
-                    .background(.bar)
-                    .clipShape(.rect(cornerRadius: 4))
-            }
-            .buttonStyle(.plain)
+    private func rate(systemImage: String, tint: Color, bytes: Int64) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage).foregroundStyle(tint)
+            Text(ByteCountFormatter.peeri(bytes) + "/s")
+                .monospacedDigit()
         }
-        .padding(.vertical, 4)
+    }
+
+    private func total(_ label: String, _ bytes: Int64) -> some View {
+        Text("\(label) " + ByteCountFormatter.peeri(bytes))
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
     }
 }
 
 #Preview {
-    DownloadStatsFooter(collapsed: .constant(false), allPaused: false)
+    DownloadStatsFooter(allPaused: false)
         .environment(DownloadManager.preview())
         .frame(width: 700)
 }

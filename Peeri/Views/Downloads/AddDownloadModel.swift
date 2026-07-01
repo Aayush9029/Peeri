@@ -9,10 +9,16 @@ final class AddDownloadModel {
     var isDroppingFile = false
 
     var validURLs: [URL] {
-        lines.compactMap { URL(string: $0) }
+        lines.compactMap { Self.downloadURL(from: $0) }
     }
 
-    var hasValidInput: Bool { !validURLs.isEmpty }
+    var invalidURLCount: Int {
+        lines.count - validURLs.count
+    }
+
+    var hasValidInput: Bool {
+        !validURLs.isEmpty && invalidURLCount == 0
+    }
 
     var isEmpty: Bool {
         urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -25,11 +31,19 @@ final class AddDownloadModel {
             .filter { !$0.isEmpty }
     }
 
+    private static let supportedURLSchemes: Set<String> = [
+        "http",
+        "https",
+        "ftp",
+        "sftp",
+        "magnet"
+    ]
+
     var clipboardPreview: String? {
         guard let content = NSPasteboard.general.string(forType: .string)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !content.isEmpty,
-            content.hasPrefix("http") || content.hasPrefix("magnet:?") || content.hasPrefix("ftp")
+            Self.downloadURL(from: content) != nil
         else { return nil }
         return String(content.prefix(60)) + (content.count > 60 ? "..." : "")
     }
@@ -50,5 +64,13 @@ final class AddDownloadModel {
         panel.allowedContentTypes = [UTType(filenameExtension: "torrent") ?? .data]
         panel.allowsMultipleSelection = false
         return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    private static func downloadURL(from line: String) -> URL? {
+        guard let url = URL(string: line),
+              let scheme = url.scheme?.lowercased(),
+              supportedURLSchemes.contains(scheme)
+        else { return nil }
+        return url
     }
 }

@@ -1,9 +1,18 @@
 import Foundation
 import Shared
 
+public enum VideoFormatPreference: String, Codable, CaseIterable, Identifiable, Sendable {
+    case best
+    case mp4
+    case audioOnly
+
+    public var id: String { rawValue }
+}
+
 public struct PeeriSettings: Codable, Equatable {
     // MARK: - General Settings
     public var downloadDirectory: String
+    public var downloadDirectoryBookmark: Data?
     public var logLevel: String
 
     // MARK: - Connection Settings
@@ -26,8 +35,12 @@ public struct PeeriSettings: Codable, Equatable {
     public var checkIntegrity: Bool
     public var continueDownloads: Bool
 
+    // MARK: - Video Settings
+    public var videoFormatPreference: VideoFormatPreference
+
     public init(
         downloadDirectory: String = NSHomeDirectory() + "/Downloads",
+        downloadDirectoryBookmark: Data? = nil,
         logLevel: String = "info",
         maxConcurrentDownloads: Int = 5,
         maxConnectionPerServer: Int = 10,
@@ -40,9 +53,11 @@ public struct PeeriSettings: Codable, Equatable {
         btRequestPeerSpeedLimit: String = "100K",
         enablePeerExchange: Bool = true,
         checkIntegrity: Bool = true,
-        continueDownloads: Bool = true
+        continueDownloads: Bool = true,
+        videoFormatPreference: VideoFormatPreference = .best
     ) {
         self.downloadDirectory = downloadDirectory
+        self.downloadDirectoryBookmark = downloadDirectoryBookmark
         self.logLevel = logLevel
         self.maxConcurrentDownloads = maxConcurrentDownloads
         self.maxConnectionPerServer = maxConnectionPerServer
@@ -56,9 +71,51 @@ public struct PeeriSettings: Codable, Equatable {
         self.enablePeerExchange = enablePeerExchange
         self.checkIntegrity = checkIntegrity
         self.continueDownloads = continueDownloads
+        self.videoFormatPreference = videoFormatPreference
     }
 
     public static let `default` = PeeriSettings()
+
+    private enum CodingKeys: String, CodingKey {
+        case downloadDirectory
+        case downloadDirectoryBookmark
+        case logLevel
+        case maxConcurrentDownloads
+        case maxConnectionPerServer
+        case split
+        case minSplitSize
+        case maxOverallDownloadLimit
+        case maxOverallUploadLimit
+        case btEnableLPD
+        case btMaxPeers
+        case btRequestPeerSpeedLimit
+        case enablePeerExchange
+        case checkIntegrity
+        case continueDownloads
+        case videoFormatPreference
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self.default
+
+        downloadDirectory = try container.decodeIfPresent(String.self, forKey: .downloadDirectory) ?? defaults.downloadDirectory
+        downloadDirectoryBookmark = try container.decodeIfPresent(Data.self, forKey: .downloadDirectoryBookmark)
+        logLevel = try container.decodeIfPresent(String.self, forKey: .logLevel) ?? defaults.logLevel
+        maxConcurrentDownloads = try container.decodeIfPresent(Int.self, forKey: .maxConcurrentDownloads) ?? defaults.maxConcurrentDownloads
+        maxConnectionPerServer = try container.decodeIfPresent(Int.self, forKey: .maxConnectionPerServer) ?? defaults.maxConnectionPerServer
+        split = try container.decodeIfPresent(Int.self, forKey: .split) ?? defaults.split
+        minSplitSize = try container.decodeIfPresent(String.self, forKey: .minSplitSize) ?? defaults.minSplitSize
+        maxOverallDownloadLimit = try container.decodeIfPresent(Int.self, forKey: .maxOverallDownloadLimit) ?? defaults.maxOverallDownloadLimit
+        maxOverallUploadLimit = try container.decodeIfPresent(Int.self, forKey: .maxOverallUploadLimit) ?? defaults.maxOverallUploadLimit
+        btEnableLPD = try container.decodeIfPresent(Bool.self, forKey: .btEnableLPD) ?? defaults.btEnableLPD
+        btMaxPeers = try container.decodeIfPresent(Int.self, forKey: .btMaxPeers) ?? defaults.btMaxPeers
+        btRequestPeerSpeedLimit = try container.decodeIfPresent(String.self, forKey: .btRequestPeerSpeedLimit) ?? defaults.btRequestPeerSpeedLimit
+        enablePeerExchange = try container.decodeIfPresent(Bool.self, forKey: .enablePeerExchange) ?? defaults.enablePeerExchange
+        checkIntegrity = try container.decodeIfPresent(Bool.self, forKey: .checkIntegrity) ?? defaults.checkIntegrity
+        continueDownloads = try container.decodeIfPresent(Bool.self, forKey: .continueDownloads) ?? defaults.continueDownloads
+        videoFormatPreference = try container.decodeIfPresent(VideoFormatPreference.self, forKey: .videoFormatPreference) ?? defaults.videoFormatPreference
+    }
 
     /// Generate aria2.conf file content from settings
     public func toAria2ConfigString(logPath: String) -> String {
