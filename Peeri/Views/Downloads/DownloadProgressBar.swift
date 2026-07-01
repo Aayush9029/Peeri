@@ -7,18 +7,21 @@ struct DownloadProgressBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            ZStack {
-                Capsule().fill(.quaternary)
-                HStack {
-                    Capsule()
-                        .fill(fill)
-                        .frame(width: max(0, geo.size.width * progress))
-                    Spacer(minLength: 0)
-                }
+            let clampedProgress = max(0, min(1, progress))
+            let fillWidth = clampedProgress * geo.size.width
 
-                if status == .downloading, progress > 0 {
-                    shimmer(width: geo.size.width)
-                }
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary)
+                Capsule()
+                    .fill(fill)
+                    .frame(width: fillWidth)
+                    .overlay {
+                        if status == .downloading, fillWidth > 0 {
+                            shimmer(width: fillWidth)
+                        }
+                    }
+                    .clipShape(Capsule())
+                    .animation(.spring(response: 0.35, dampingFraction: 0.82), value: clampedProgress)
             }
         }
         .frame(height: 8)
@@ -40,9 +43,8 @@ struct DownloadProgressBar: View {
             let duration = 1.15
             let phase = context.date.timeIntervalSinceReferenceDate
                 .truncatingRemainder(dividingBy: duration) / duration
-            let fillWidth = max(0, width * progress)
-            let shimmerWidth = max(28, width * 0.32)
-            let travel = fillWidth + shimmerWidth * 2
+            let shimmerWidth = max(28, width * 0.45)
+            let travel = width + shimmerWidth * 2
 
             Rectangle()
                 .fill(
@@ -54,11 +56,8 @@ struct DownloadProgressBar: View {
                 )
                 .frame(width: shimmerWidth)
                 .offset(x: -shimmerWidth + travel * phase)
-                .mask(alignment: .leading) {
-                    Capsule()
-                        .frame(width: fillWidth)
-                }
         }
+        .frame(width: width, alignment: .leading)
     }
 }
 
