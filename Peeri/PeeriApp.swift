@@ -30,5 +30,7 @@ struct PeeriApp: App {
             SettingsView()
                 .environment(downloadManager)
         }
+        .windowToolbarStyle(.unified)
+        .defaultSize(width: 740, height: 680)
     }
 }

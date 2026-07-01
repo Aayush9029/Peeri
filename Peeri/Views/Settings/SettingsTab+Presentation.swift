@@ -19,19 +19,6 @@ extension SettingsTab {
         }
     }
 
-    var description: String {
-        switch self {
-        case .general:
-            "App defaults, save location, and logging."
-        case .downloads:
-            "Connection, speed, and file handling behavior."
-        case .bitTorrent:
-            "Peer discovery and torrent connection limits."
-        case .video:
-            "YouTube and video download handling through yt-dlp."
-        }
-    }
-
     var fill: Color {
         switch self {
         case .general: .indigo

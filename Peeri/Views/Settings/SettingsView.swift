@@ -23,15 +23,11 @@ struct SettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 240)
         } detail: {
-            VStack(spacing: 0) {
-                SettingsPaneHeader(tab: selectedTab)
-                Divider()
-                pane
-            }
-            .navigationTitle(selectedTab.title)
+            pane
+                .navigationTitle(selectedTab.title)
         }
         .navigationSplitViewStyle(.balanced)
-        .frame(minWidth: 740, minHeight: 560)
+        .frame(minWidth: 740, minHeight: 680)
         .onChange(of: settings) { _, newSettings in
             Task { await downloadManager.applySettings(newSettings) }
         }
