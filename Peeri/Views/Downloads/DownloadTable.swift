@@ -7,8 +7,8 @@ struct DownloadTable: View {
 
     let downloads: [DownloadFile]
 
-    @State private var selection: Set<DownloadFile.ID> = []
-    @State private var detailDownload: DownloadFile?
+    @Binding var selection: Set<DownloadFile.ID>
+    @Binding var detailDownload: DownloadFile?
 
     private var hasTorrents: Bool {
         downloads.contains(where: \.isTorrent)
@@ -22,6 +22,10 @@ struct DownloadTable: View {
                     Text(download.fileName)
                         .lineLimit(1)
                         .truncationMode(.middle)
+                }
+                .popover(isPresented: detailPresentation(for: download), arrowEdge: .trailing) {
+                    DownloadDetailPopoverView(downloadID: download.id)
+                        .environment(downloadManager)
                 }
             }
             .width(min: 220, ideal: 320)
@@ -60,19 +64,18 @@ struct DownloadTable: View {
                 }
                 .width(min: 50, ideal: 64)
             }
-
-            TableColumn("") { download in
-                detailButton(for: download)
-            }
-            .width(34)
         }
         .tableStyle(.inset)
         .contextMenu(forSelectionType: DownloadFile.ID.self) { ids in
             if let download = download(for: ids) {
-                DownloadActionsMenu(download: download) { detailDownload = download }
+                DownloadActionsMenu(download: download) {
+                    detailDownload = download
+                }
             }
         } primaryAction: { ids in
-            if let download = download(for: ids) { detailDownload = download }
+            if let download = download(for: ids) {
+                downloadManager.openDownload(download)
+            }
         }
         .overlay {
             if downloads.isEmpty {
@@ -90,21 +93,6 @@ struct DownloadTable: View {
         return downloads.first { $0.id == id }
     }
 
-    private func detailButton(for download: DownloadFile) -> some View {
-        Button {
-            detailDownload = download
-        } label: {
-            Image(systemName: "info.circle")
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
-        .help("Show Details")
-        .popover(isPresented: detailPresentation(for: download), arrowEdge: .trailing) {
-            DownloadDetailPopoverView(downloadID: download.id)
-                .environment(downloadManager)
-        }
-    }
-
     private func detailPresentation(for download: DownloadFile) -> Binding<Bool> {
         Binding(
             get: { detailDownload?.id == download.id },
@@ -118,13 +106,21 @@ struct DownloadTable: View {
 }
 
 #Preview("Populated") {
-    DownloadTable(downloads: .sampleList)
+    DownloadTable(
+        downloads: .sampleList,
+        selection: .constant([]),
+        detailDownload: .constant(nil)
+    )
         .environment(DownloadManager.preview())
         .frame(width: 860, height: 420)
 }
 
 #Preview("Empty") {
-    DownloadTable(downloads: [])
+    DownloadTable(
+        downloads: [],
+        selection: .constant([]),
+        detailDownload: .constant(nil)
+    )
         .environment(DownloadManager.preview(downloads: []))
         .frame(width: 860, height: 420)
 }

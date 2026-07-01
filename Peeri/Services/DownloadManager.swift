@@ -315,17 +315,21 @@ final class DownloadManager {
         }
     }
 
-    // MARK: - Clipboard & Finder
+    // MARK: - File Actions
+
+    func resolvedFileURL(for download: DownloadFile) -> URL? {
+        withResolvedFileURL(for: download) { $0 }
+    }
+
+    func openDownload(_ download: DownloadFile) {
+        withResolvedFileURL(for: download) { url in
+            NSWorkspace.shared.open(url)
+        }
+    }
 
     func showInFinder(_ download: DownloadFile) {
-        if let filePath = download.filePath {
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
-        } else {
-            let directory = DownloadDirectoryAccess(settings: settings)
-            let url = directory.url.appendingPathComponent(download.fileName)
-            if FileManager.default.fileExists(atPath: url.path) {
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            }
+        withResolvedFileURL(for: download) { url in
+            NSWorkspace.shared.activateFileViewerSelecting([url])
         }
     }
 
@@ -334,8 +338,29 @@ final class DownloadManager {
     }
 
     func copyFilePath(_ download: DownloadFile) {
-        guard let filePath = download.filePath else { return }
-        copyToPasteboard(filePath)
+        withResolvedFileURL(for: download) { url in
+            copyToPasteboard(url.path)
+        }
+    }
+
+    private func withResolvedFileURL<Result>(
+        for download: DownloadFile,
+        perform action: (URL) -> Result
+    ) -> Result? {
+        if let filePath = download.filePath {
+            let url = URL(fileURLWithPath: filePath)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return action(url)
+            }
+        }
+
+        let directory = DownloadDirectoryAccess(settings: settings)
+        let didStartAccessing = directory.startAccessing()
+        defer { directory.stopAccessing(didStartAccessing) }
+
+        let url = directory.url.appendingPathComponent(download.fileName)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return action(url)
     }
 
     private func copyToPasteboard(_ string: String) {

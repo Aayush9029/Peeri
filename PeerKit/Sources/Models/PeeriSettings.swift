@@ -19,7 +19,7 @@ public struct PeeriSettings: Codable, Equatable {
     public var maxConcurrentDownloads: Int
     public var maxConnectionPerServer: Int
     public var split: Int
-    public var minSplitSize: String
+    public var minSplitSize: Int  // MB
 
     // MARK: - Speed Limits
     public var maxOverallDownloadLimit: Int  // KB/s, 0 = unlimited
@@ -45,7 +45,7 @@ public struct PeeriSettings: Codable, Equatable {
         maxConcurrentDownloads: Int = 5,
         maxConnectionPerServer: Int = 10,
         split: Int = 10,
-        minSplitSize: String = "1M",
+        minSplitSize: Int = 1,
         maxOverallDownloadLimit: Int = 0,
         maxOverallUploadLimit: Int = 50,
         btEnableLPD: Bool = true,
@@ -105,7 +105,14 @@ public struct PeeriSettings: Codable, Equatable {
         maxConcurrentDownloads = try container.decodeIfPresent(Int.self, forKey: .maxConcurrentDownloads) ?? defaults.maxConcurrentDownloads
         maxConnectionPerServer = try container.decodeIfPresent(Int.self, forKey: .maxConnectionPerServer) ?? defaults.maxConnectionPerServer
         split = try container.decodeIfPresent(Int.self, forKey: .split) ?? defaults.split
-        minSplitSize = try container.decodeIfPresent(String.self, forKey: .minSplitSize) ?? defaults.minSplitSize
+        if let minSplitSize = try? container.decode(Int.self, forKey: .minSplitSize) {
+            self.minSplitSize = max(1, minSplitSize)
+        } else if let legacyMinSplitSize = try? container.decode(String.self, forKey: .minSplitSize),
+                  let minSplitSize = Self.megabytes(fromAria2SizeNotation: legacyMinSplitSize) {
+            self.minSplitSize = minSplitSize
+        } else {
+            self.minSplitSize = defaults.minSplitSize
+        }
         maxOverallDownloadLimit = try container.decodeIfPresent(Int.self, forKey: .maxOverallDownloadLimit) ?? defaults.maxOverallDownloadLimit
         maxOverallUploadLimit = try container.decodeIfPresent(Int.self, forKey: .maxOverallUploadLimit) ?? defaults.maxOverallUploadLimit
         btEnableLPD = try container.decodeIfPresent(Bool.self, forKey: .btEnableLPD) ?? defaults.btEnableLPD
@@ -142,7 +149,7 @@ public struct PeeriSettings: Codable, Equatable {
         max-connection-per-server=\(maxConnectionPerServer)
         max-overall-download-limit=\(maxOverallDownloadLimit > 0 ? "\(maxOverallDownloadLimit)K" : "0")
         max-overall-upload-limit=\(maxOverallUploadLimit > 0 ? "\(maxOverallUploadLimit)K" : "0")
-        min-split-size=\(minSplitSize)
+        min-split-size=\(minSplitSize)M
         split=\(split)
 
         # Logging
@@ -161,13 +168,40 @@ public struct PeeriSettings: Codable, Equatable {
             "max-concurrent-downloads": "\(maxConcurrentDownloads)",
             "max-connection-per-server": "\(maxConnectionPerServer)",
             "split": "\(split)",
-            "min-split-size": minSplitSize,
+            "min-split-size": "\(minSplitSize)M",
             "max-overall-download-limit": maxOverallDownloadLimit > 0 ? "\(maxOverallDownloadLimit)K" : "0",
             "max-overall-upload-limit": maxOverallUploadLimit > 0 ? "\(maxOverallUploadLimit)K" : "0",
             "bt-max-peers": "\(btMaxPeers)",
             "bt-request-peer-speed-limit": btRequestPeerSpeedLimit,
             "log-level": logLevel
         ]
+    }
+
+    private static func megabytes(fromAria2SizeNotation value: String) -> Int? {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else { return nil }
+
+        let suffix = trimmedValue.last?.lowercased()
+        let numberText: String
+        let multiplier: Double
+
+        switch suffix {
+        case "k":
+            numberText = String(trimmedValue.dropLast())
+            multiplier = 1.0 / 1024.0
+        case "m":
+            numberText = String(trimmedValue.dropLast())
+            multiplier = 1
+        case "g":
+            numberText = String(trimmedValue.dropLast())
+            multiplier = 1024
+        default:
+            numberText = trimmedValue
+            multiplier = 1.0 / 1_048_576.0
+        }
+
+        guard let number = Double(numberText) else { return nil }
+        return max(1, Int((number * multiplier).rounded(.up)))
     }
 }
 

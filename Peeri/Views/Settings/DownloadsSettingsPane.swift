@@ -8,24 +8,36 @@ struct DownloadsSettingsPane: View {
     var body: some View {
         Form {
             Section("Connections") {
-                Stepper(value: Binding($settings.maxConcurrentDownloads), in: 1 ... 16) {
-                    LabeledContent("Concurrent Downloads", value: "\(settings.maxConcurrentDownloads)")
-                }
+                stepperRow(
+                    "Concurrent Downloads",
+                    value: Binding($settings.maxConcurrentDownloads),
+                    range: 1 ... 16
+                )
 
-                Stepper(value: Binding($settings.maxConnectionPerServer), in: 1 ... 16) {
-                    LabeledContent("Connections per Server", value: "\(settings.maxConnectionPerServer)")
-                }
+                stepperRow(
+                    "Connections per Server",
+                    value: Binding($settings.maxConnectionPerServer),
+                    range: 1 ... 16
+                )
 
-                Stepper(value: Binding($settings.split), in: 1 ... 16) {
-                    LabeledContent("Split Chunks per File", value: "\(settings.split)")
-                }
+                stepperRow(
+                    "Split Chunks per File",
+                    value: Binding($settings.split),
+                    range: 1 ... 16
+                )
 
                 LabeledContent("Minimum Split Size") {
-                    TextField("1M", text: Binding($settings.minSplitSize))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 100)
+                    HStack(spacing: 10) {
+                        Slider(value: minSplitSizeValue, in: 1 ... 64, step: 1)
+                            .frame(width: 170)
+
+                        Text("\(settings.minSplitSize) MB")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 52, alignment: .trailing)
+                    }
                 }
-                Text("Use aria2 size notation, for example 1M or 512K.")
+                Text("Minimum size of each split chunk.")
                     .settingDescription()
             }
 
@@ -50,13 +62,45 @@ struct DownloadsSettingsPane: View {
         .formStyle(.grouped)
     }
 
+    private var minSplitSizeValue: Binding<Double> {
+        Binding(
+            get: { Double(settings.minSplitSize) },
+            set: { newValue in
+                $settings.withLock {
+                    $0.minSplitSize = Int(newValue.rounded())
+                }
+            }
+        )
+    }
+
+    private func stepperRow(
+        _ title: LocalizedStringKey,
+        value: Binding<Int>,
+        range: ClosedRange<Int>
+    ) -> some View {
+        LabeledContent(title) {
+            HStack(spacing: 8) {
+                Text(value.wrappedValue, format: .number)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 24, alignment: .trailing)
+
+                Stepper(title, value: value, in: range)
+                    .labelsHidden()
+            }
+        }
+    }
+
     private func speedField(value: Binding<Int>) -> some View {
         HStack(spacing: 6) {
             TextField("0", value: value, format: .number)
                 .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
                 .frame(width: 92)
             Text("KB/s")
                 .foregroundStyle(.secondary)
+                .frame(width: 36, alignment: .leading)
         }
     }
 }

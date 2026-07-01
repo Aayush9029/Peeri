@@ -26,23 +26,15 @@ struct AddDownloadView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 34, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.blue)
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Add Download")
+                .font(.title3.weight(.semibold))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Add Download")
-                    .font(.title3.weight(.semibold))
-
-                Text("HTTP, FTP, SFTP, magnet, and video links")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
+            Text("HTTP, FTP, SFTP, magnet, and video links")
+                .font(.callout)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var linkInput: some View {
