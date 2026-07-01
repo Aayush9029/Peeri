@@ -4,6 +4,8 @@ import SwiftUI
 
 @main
 struct PeeriApp: App {
+    @Environment(\.openWindow) private var openWindow
+
     @State private var downloadManager = DownloadManager()
     @State private var daemonManager = Aria2DaemonManager()
     @State private var appUI = AppUIModel()
@@ -24,13 +26,20 @@ struct PeeriApp: App {
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }
+
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    openWindow(id: "settings")
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
         }
 
-        Settings {
+        Window("Peeri Settings", id: "settings") {
             SettingsView()
                 .environment(downloadManager)
         }
-        .windowToolbarStyle(.unified)
+        .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 740, height: 680)
     }
 }
