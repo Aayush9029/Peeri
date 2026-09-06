@@ -14,6 +14,7 @@ struct PieceGridView: View {
     private let spacing: CGFloat = 3
     private let maxCells = 2048
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var availableWidth: CGFloat = 0
 
     private var cells: [Double] {
@@ -39,13 +40,19 @@ struct PieceGridView: View {
                 )
                 context.fill(
                     Path(roundedRect: rect, cornerRadius: 2.5),
-                    with: .color(color(for: cells[index]))
+                    with: .linearGradient(
+                        Gradient(colors: [color(for: cells[index]), color(for: cells[index]).opacity(cells[index] > 0 ? 0.65 : 1)]),
+                        startPoint: rect.origin,
+                        endPoint: CGPoint(x: rect.maxX, y: rect.maxY)
+                    )
                 )
             }
         }
         .frame(height: gridHeight(for: availableWidth, cellCount: cells.count))
         .background(widthReader)
-        .animation(.smooth(duration: 0.45), value: cells)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.45), value: cells)
+        .accessibilityLabel("Torrent pieces")
+        .accessibilityValue("\(numPieces) pieces; brighter cells indicate downloaded data")
     }
 
     private var widthReader: some View {
@@ -71,20 +78,3 @@ struct PieceGridView: View {
         return CGFloat(rows) * (cellSize + spacing) - spacing
     }
 }
-
-#if DEBUG
-#Preview("Partial") {
-    PieceGridView(bitfield: "ffffff00ff00ff0000", numPieces: 72)
-        .padding()
-        .frame(width: 420)
-}
-
-#Preview("Large") {
-    PieceGridView(
-        bitfield: String(repeating: "f", count: 600) + String(repeating: "0", count: 400),
-        numPieces: 4000
-    )
-    .padding()
-    .frame(width: 420)
-}
-#endif

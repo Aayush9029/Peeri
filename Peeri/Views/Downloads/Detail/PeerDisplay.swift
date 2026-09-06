@@ -39,9 +39,9 @@ struct PeerDisplay: Identifiable {
         self.progress = progress
     }
 
-    init(_ info: Aria2PeerInfo, numPieces: Int, index: Int) {
+    init(_ info: Aria2PeerInfo, numPieces: Int) {
         self.init(
-            id: ID(rawValue: "\(index)-\(info.ip):\(info.port)"),
+            id: ID(rawValue: "[\(info.ip)]:\(info.port)"),
             ip: info.ip,
             port: info.port,
             downloadSpeed: Int64(info.downloadSpeed) ?? 0,
@@ -68,33 +68,9 @@ extension IdentifiedArrayOf<PeerDisplay> {
     /// Projects raw aria2 peers into a deduplicated, identified collection.
     static func from(_ peers: [Aria2PeerInfo], numPieces: Int) -> Self {
         IdentifiedArray(
-            peers.enumerated().map { PeerDisplay($0.element, numPieces: numPieces, index: $0.offset) },
+            peers.map { PeerDisplay($0, numPieces: numPieces) },
             id: \.id,
             uniquingIDsWith: { first, _ in first }
         )
     }
 }
-
-#if DEBUG
-extension PeerDisplay {
-    static func preview(
-        ip: String = "192.168.1.42",
-        seeder: Bool = false,
-        progress: Double = 0.5,
-        download: Int64 = 1_572_864,
-        upload: Int64 = 0
-    ) -> PeerDisplay {
-        PeerDisplay(
-            id: ID(rawValue: ip),
-            ip: ip,
-            port: "51413",
-            downloadSpeed: download,
-            uploadSpeed: upload,
-            isSeeder: seeder,
-            amChoking: true,
-            peerChoking: !seeder,
-            progress: progress
-        )
-    }
-}
-#endif

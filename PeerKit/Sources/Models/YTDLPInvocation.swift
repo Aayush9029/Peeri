@@ -51,9 +51,9 @@ public extension VideoFormatPreference {
     var ytdlpFormat: String {
         switch self {
         case .best:
-            "b"
+            "bv*+ba/b"
         case .mp4:
-            "best[ext=mp4]/best"
+            "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b"
         case .audioOnly:
             "bestaudio[ext=m4a]/bestaudio/best"
         }

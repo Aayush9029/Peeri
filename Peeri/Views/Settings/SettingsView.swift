@@ -17,19 +17,25 @@ struct SettingsView: View {
                         SettingsTabIcon(tab: tab, size: 20)
                         Text(tab.title)
                     }
+                    .padding(.vertical, 4)
                     .tag(tab)
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 190, ideal: 210, max: 240)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 180, max: 180)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             pane
-                .navigationTitle(selectedTab.title)
+            .navigationTitle("")
+            .background {
+                VisualEffectView(material: .underWindowBackground, blendingMode: .behindWindow)
+                    .ignoresSafeArea()
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 740, minHeight: 680)
-        .onChange(of: settings) { _, newSettings in
-            Task { await downloadManager.applySettings(newSettings) }
+        .onChange(of: settings) { previous, newSettings in
+            downloadManager.settingsChanged(newSettings, previous: previous)
         }
     }
 
@@ -46,15 +52,12 @@ struct SettingsView: View {
             DownloadsSettingsPane()
         case .bitTorrent:
             BitTorrentSettingsPane()
+        case .trackers:
+            TrackersSettingsPane()
+        case .network:
+            NetworkSettingsPane()
         case .video:
             VideoSettingsPane()
         }
     }
 }
-
-#if DEBUG
-#Preview {
-    SettingsView()
-        .environment(DownloadManager.preview())
-}
-#endif

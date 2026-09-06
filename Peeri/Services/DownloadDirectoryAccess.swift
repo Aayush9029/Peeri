@@ -5,8 +5,11 @@ struct DownloadDirectoryAccess {
     let url: URL
     let isSecurityScoped: Bool
 
-    init(settings: PeeriSettings) {
-        if let bookmarkedURL = Self.bookmarkedURL(from: settings) {
+    init(settings: PeeriSettings, destination: URL? = nil) {
+        if let destination {
+            url = destination
+            isSecurityScoped = true
+        } else if let bookmarkedURL = Self.bookmarkedURL(from: settings) {
             url = bookmarkedURL
             isSecurityScoped = true
         } else {

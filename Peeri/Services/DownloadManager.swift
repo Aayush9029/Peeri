@@ -58,6 +58,9 @@ final class DownloadManager {
     @ObservationIgnored private var updateTask: Task<Void, Never>?
     @ObservationIgnored private var videoDownloadTasks: [DownloadFile.ID: Task<Void, Never>] = [:]
     @ObservationIgnored private var lastPersistedSignature = 0
+    @ObservationIgnored private var removedGIDs: Set<String> = []
+    @ObservationIgnored private var settingsTask: Task<Void, Never>?
+    @ObservationIgnored private var appliedSettings: PeeriSettings?
 
     private let ytdlpClient = YTDLPClient()
     private let ytdlpGIDPrefix = "yt-dlp:"
@@ -68,9 +71,12 @@ final class DownloadManager {
 
     private var hasEverConnected = false
 
-    init(startPolling: Bool = true) {
+    init() {
         downloads = persistedDownloads
-        guard startPolling else { return }
+        for index in downloads.indices where downloads[index].isVideoDownload && [.pending, .downloading].contains(downloads[index].status) {
+            downloads[index].status = .failed
+            downloads[index].downloadSpeed = 0
+        }
         initializeAria2Client()
         checkConnectionAndStartTimer()
     }
@@ -173,32 +179,27 @@ final class DownloadManager {
         updateTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.updateDownloads()
-                let idle = self?.shouldIdle ?? true
-                try? await Task.sleep(nanoseconds: idle ? 2_500_000_000 : 1_000_000_000)
+                try? await Task.sleep(for: .seconds(1))
                 if Task.isCancelled { return }
             }
         }
     }
 
-    private var shouldIdle: Bool { isConnected && !hasActiveTransfers }
-
     // MARK: - Download Actions
 
-    func addDownload(url: URL) async {
+    func addDownload(url: URL, destination: URL? = nil) async {
         if ytdlpClient.canHandle(url) {
-            startVideoDownload(url: url)
+            startVideoDownload(url: url, destination: destination)
             return
         }
 
         do {
-            let directory = DownloadDirectoryAccess(settings: settings)
+            let directory = DownloadDirectoryAccess(settings: settings, destination: destination)
             let didStartAccessing = directory.startAccessing()
             defer { directory.stopAccessing(didStartAccessing) }
 
-            let options: [String: String] = [
-                "dir": directory.url.path,
-                "out": url.lastPathComponent.isEmpty ? "download" : url.lastPathComponent
-            ]
+            var options = settings.toAria2DownloadOptions()
+            options["dir"] = directory.url.path
 
             let gid = try await aria2Client.addDownload(url, options)
             logger.info("Added download with GID: \(gid)")
@@ -207,6 +208,7 @@ final class DownloadManager {
             downloads[id: newDownload.id] = newDownload
             persistIfStructureChanged()
 
+            try await aria2Client.saveSession()
             await updateDownloads()
         } catch {
             logger.error("Failed to add download: \(error.localizedDescription)")
@@ -214,15 +216,20 @@ final class DownloadManager {
         }
     }
 
-    func addTorrent(fileURL: URL) async {
+    func addTorrent(fileURL: URL, destination: URL? = nil) async {
         do {
+            let accessingFile = fileURL.startAccessingSecurityScopedResource()
+            defer { if accessingFile { fileURL.stopAccessingSecurityScopedResource() } }
             let base64 = try Data(contentsOf: fileURL).base64EncodedString()
-            let directory = DownloadDirectoryAccess(settings: settings)
+            let directory = DownloadDirectoryAccess(settings: settings, destination: destination)
             let didStartAccessing = directory.startAccessing()
             defer { directory.stopAccessing(didStartAccessing) }
 
-            let gid = try await aria2Client.addTorrent(base64, [], ["dir": directory.url.path])
+            var options = settings.toAria2DownloadOptions()
+            options["dir"] = directory.url.path
+            let gid = try await aria2Client.addTorrent(base64, [], options)
             logger.info("Added torrent with GID: \(gid)")
+            try await aria2Client.saveSession()
             await updateDownloads()
         } catch {
             logger.error("Failed to add torrent: \(error.localizedDescription)")
@@ -237,6 +244,7 @@ final class DownloadManager {
             guard try await aria2Client.pause(download.gid) else { return }
             downloads[id: download.id]?.status = .paused
             persistIfStructureChanged()
+            try await aria2Client.saveSession()
             logger.info("Download paused: \(download.fileName)")
         } catch {
             logger.error("Failed to pause download: \(error.localizedDescription)")
@@ -251,6 +259,7 @@ final class DownloadManager {
             guard try await aria2Client.unpause(download.gid) else { return }
             downloads[id: download.id]?.status = .downloading
             persistIfStructureChanged()
+            try await aria2Client.saveSession()
             logger.info("Download resumed: \(download.fileName)")
         } catch {
             logger.error("Failed to resume download: \(error.localizedDescription)")
@@ -259,40 +268,53 @@ final class DownloadManager {
     }
 
     func cancelDownload(_ download: DownloadFile) async {
-        if isYTDLPDownload(download) {
-            videoDownloadTasks[download.id]?.cancel()
-            videoDownloadTasks[download.id] = nil
-            downloads.remove(id: download.id)
-            refreshCurrentRates()
-            persistIfStructureChanged()
-            logger.info("Video download canceled: \(download.fileName)")
-            return
-        }
-
-        do {
-            guard try await aria2Client.remove(download.gid) else { return }
-            downloads.remove(id: download.id)
-            persistIfStructureChanged()
-            logger.info("Download canceled: \(download.fileName)")
-        } catch {
-            logger.error("Failed to cancel download: \(error.localizedDescription)")
-            lastError = "Failed to cancel download: \(error.localizedDescription)"
-        }
+        await removeDownload(download)
     }
 
-    func removeDownload(_ download: DownloadFile) {
+    func removeDownload(_ download: DownloadFile) async {
         if isYTDLPDownload(download) {
             videoDownloadTasks[download.id]?.cancel()
             videoDownloadTasks[download.id] = nil
+        } else {
+            do {
+                if [.downloading, .seeding, .pending, .paused].contains(download.status) {
+                    _ = try await aria2Client.forceRemove(download.gid)
+                }
+                let results = try await aria2Client.tellStopped(0, 1000)
+                if results.contains(where: { $0.gid == download.gid }) {
+                    try await aria2Client.removeDownloadResult(download.gid)
+                }
+                removedGIDs.insert(download.gid)
+                try await aria2Client.saveSession()
+            } catch {
+                lastError = "Could not remove transfer: \(error.localizedDescription)"
+                return
+            }
         }
         downloads.remove(id: download.id)
         refreshCurrentRates()
         persistIfStructureChanged()
-        logger.info("Download removed from list: \(download.fileName)")
     }
 
     func retryDownload(_ download: DownloadFile) async {
-        await addDownload(url: download.url)
+        await removeDownload(download)
+        guard downloads[id: download.id] == nil else { return }
+        await addDownload(url: download.url, destination: download.destinationDirectory.map { URL(fileURLWithPath: $0, isDirectory: true) })
+    }
+
+    func pauseAll() async {
+        do {
+            try await aria2Client.pauseAll()
+            try await aria2Client.saveSession()
+            await updateDownloads()
+        } catch { lastError = error.localizedDescription }
+    }
+
+    func resumeAll() async {
+        do {
+            try await aria2Client.unpauseAll()
+            await updateDownloads()
+        } catch { lastError = error.localizedDescription }
     }
 
     // MARK: - Detail Queries
@@ -373,10 +395,31 @@ final class DownloadManager {
     func applySettings(_ settings: PeeriSettings) async {
         do {
             try await aria2Client.changeGlobalOption(settings.toAria2GlobalOptions())
+            let previousOptions = appliedSettings?.toAria2DownloadOptions() ?? [:]
+            let options = settings.toAria2DownloadOptions().filter {
+                ["seed-time", "seed-ratio", "bt-max-peers", "bt-request-peer-speed-limit"].contains($0.key)
+                    && previousOptions[$0.key] != $0.value
+            }
+            if !options.isEmpty {
+                for download in downloads where download.isTorrent && [.downloading, .seeding, .paused, .pending].contains(download.status) {
+                    try await aria2Client.changeOption(download.gid, options)
+                }
+            }
+            appliedSettings = settings
+            try await aria2Client.saveSession()
             logger.info("Applied runtime settings to aria2")
         } catch {
             logger.error("Failed to apply settings: \(error)")
             lastError = "Failed to apply settings: \(error.localizedDescription)"
+        }
+    }
+
+    func settingsChanged(_ settings: PeeriSettings, previous: PeeriSettings) {
+        if appliedSettings == nil { appliedSettings = previous }
+        settingsTask?.cancel()
+        settingsTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            await self?.applySettings(settings)
         }
     }
 
@@ -392,13 +435,13 @@ final class DownloadManager {
             }
 
             async let active = aria2Client.tellActive()
-            async let waiting = aria2Client.tellWaiting(0, 30)
+            async let waiting = aria2Client.tellWaiting(0, 1000)
             async let stopped = aria2Client.tellStopped(0, 100)
             let (activeFiles, waitingFiles, stoppedFiles) = try await (active, waiting, stopped)
 
             updateStatistics(activeFiles)
-            updateSessionTotals()
             updateDownloadList(active: activeFiles, waiting: waitingFiles, stopped: stoppedFiles)
+            updateSessionTotals()
 
             if case .failed = connectionState {
                 connectionState = .connected
@@ -424,10 +467,6 @@ final class DownloadManager {
         if totalDownloadRate != dlRate { totalDownloadRate = dlRate }
         if totalUploadRate != ulRate { totalUploadRate = ulRate }
 
-        let hasActivity = dlRate > 0 || ulRate > 0
-            || activeTransfers.contains { $0.status == .downloading || $0.status == .seeding }
-
-        guard hasActivity else { return }
         downloadSpeedHistory.append(Double(dlRate))
         uploadSpeedHistory.append(Double(ulRate))
         if downloadSpeedHistory.count > 60 { downloadSpeedHistory.removeFirst() }
@@ -443,34 +482,53 @@ final class DownloadManager {
 
     private func updateDownloadList(active: [DownloadFile], waiting: [DownloadFile], stopped: [DownloadFile]) {
         let videoDownloads = Array(downloads.filter(isYTDLPDownload))
-        let newList = IdentifiedArray(uniqueElements: videoDownloads + active + waiting + stopped)
+        let current = (active + waiting + stopped)
+            .filter { !removedGIDs.contains($0.gid) && $0.status != .removed }
+            .map { transfer in
+                guard transfer.fileSize == nil, let hash = transfer.torrentHash,
+                      let previous = downloads.first(where: { $0.torrentHash == hash && $0.fileSize != nil })
+                else { return transfer }
+                var restored = transfer
+                restored.fileName = previous.fileName
+                restored.filePath = previous.filePath
+                restored.fileSize = previous.fileSize
+                restored.downloadedSize = previous.downloadedSize
+                return restored
+            }
+        let liveIDs = Set(current.map(\.id))
+        let history = downloads.filter {
+            !isYTDLPDownload($0) && !liveIDs.contains($0.id)
+                && [.completed, .failed].contains($0.status) && !removedGIDs.contains($0.gid)
+        }
+        let newList = IdentifiedArray(videoDownloads + current + history, uniquingIDsWith: { _, latest in latest })
         guard newList != downloads else { return }
         downloads = newList
         persistIfStructureChanged()
     }
 
-    private func startVideoDownload(url: URL) {
+    private func startVideoDownload(url: URL, destination: URL?) {
         let id = DownloadFile.ID(UUID())
         let gid = ytdlpGIDPrefix + UUID().uuidString
-        let initialName = url.host(percentEncoded: false) ?? "Video Download"
+        let initialName = "Preparing video…"
 
         downloads[id: id] = DownloadFile(
             id: id,
             gid: gid,
             url: url,
             fileName: initialName,
+            destinationDirectory: destination?.path ?? settings.downloadDirectory,
             status: .pending
         )
         persistIfStructureChanged()
 
         videoDownloadTasks[id]?.cancel()
         videoDownloadTasks[id] = Task { [weak self] in
-            await self?.runVideoDownload(id: id, url: url, initialName: initialName)
+            await self?.runVideoDownload(id: id, url: url, initialName: initialName, destination: destination)
         }
     }
 
-    private func runVideoDownload(id: DownloadFile.ID, url: URL, initialName: String) async {
-        let directory = DownloadDirectoryAccess(settings: settings)
+    private func runVideoDownload(id: DownloadFile.ID, url: URL, initialName: String, destination: URL?) async {
+        let directory = DownloadDirectoryAccess(settings: settings, destination: destination)
         let didStartAccessing = directory.startAccessing()
         defer {
             directory.stopAccessing(didStartAccessing)
@@ -480,6 +538,7 @@ final class DownloadManager {
         do {
             if let metadata = try? await ytdlpClient.metadata(for: url) {
                 try Task.checkCancellation()
+                downloads[id: id]?.videoTitle = metadata.title
                 downloads[id: id]?.fileName = metadata.title ?? initialName
                 downloads[id: id]?.thumbnailURL = metadata.thumbnailURL
                 downloads[id: id]?.status = .downloading
@@ -508,7 +567,7 @@ final class DownloadManager {
                 downloads[id: id]?.fileName = outputURL.lastPathComponent
                 downloads[id: id]?.filePath = outputURL.path
                 downloads[id: id]?.fileSize = size
-                downloads[id: id]?.downloadedSize = size ?? downloads[id: id]?.downloadedSize ?? 0
+                if let size { downloads[id: id]?.downloadedSize = size }
             }
             downloads[id: id]?.progressFraction = 1
             downloads[id: id]?.downloadSpeed = 0
@@ -552,7 +611,7 @@ final class DownloadManager {
             let currentFraction = downloads[id: id]?.progressFraction ?? 0
             downloads[id: id]?.progressFraction = max(currentFraction, fraction)
         }
-        downloads[id: id]?.downloadSpeed = progress.speed ?? downloads[id: id]?.downloadSpeed
+        if let speed = progress.speed { downloads[id: id]?.downloadSpeed = speed }
         downloads[id: id]?.status = .downloading
         refreshCurrentRates()
         updateSessionTotals()
@@ -582,11 +641,13 @@ final class DownloadManager {
             hasher.combine(download.status)
             hasher.combine(download.fileName)
             hasher.combine(download.filePath)
+            hasher.combine(download.destinationDirectory)
             hasher.combine(download.fileSize)
             hasher.combine(download.downloadedSize)
             hasher.combine(download.progressFraction)
             hasher.combine(download.downloadSpeed)
             hasher.combine(download.thumbnailURL)
+            hasher.combine(download.videoTitle)
         }
         let signature = hasher.finalize()
         guard signature != lastPersistedSignature else { return }
@@ -596,39 +657,8 @@ final class DownloadManager {
 
     deinit {
         connectionTask?.cancel()
+        settingsTask?.cancel()
         updateTask?.cancel()
         videoDownloadTasks.values.forEach { $0.cancel() }
     }
 }
-
-#if DEBUG
-extension DownloadManager {
-    static func preview(downloads: [DownloadFile] = .sampleList) -> DownloadManager {
-        withDependencies {
-            $0.aria2Client = .previewValue
-        } operation: {
-            let manager = DownloadManager(startPolling: false)
-            manager.seedPreviewState(downloads: downloads)
-            return manager
-        }
-    }
-
-    private func seedPreviewState(downloads: [DownloadFile]) {
-        self.downloads = IdentifiedArray(uniqueElements: downloads)
-        connectionState = .connected
-        totalDownloadRate = downloads.compactMap(\.downloadSpeed).reduce(0, +)
-        totalUploadRate = downloads.compactMap(\.uploadSpeed).reduce(0, +)
-        sessionDownloaded = downloads.reduce(0) { $0 + $1.downloadedSize }
-        sessionUploaded = downloads.reduce(0) { $0 + ($1.uploadedSize ?? 0) }
-        downloadSpeedHistory = Self.sampleHistory(peak: Double(max(totalDownloadRate, 1_048_576)))
-        uploadSpeedHistory = Self.sampleHistory(peak: Double(max(totalUploadRate, 524_288)))
-    }
-
-    private static func sampleHistory(peak: Double) -> [Double] {
-        (0..<60).map { index in
-            let phase = Double(index) / 60 * .pi * 4
-            return peak * (0.45 + 0.4 * (sin(phase) * 0.5 + 0.5))
-        }
-    }
-}
-#endif

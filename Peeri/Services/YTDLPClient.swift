@@ -101,12 +101,9 @@ struct YTDLPClient {
 
         return try await withTaskCancellationHandler {
             try await Task.detached(priority: .userInitiated) {
-                try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executableURL.path)
-
                 let task = Process()
                 task.executableURL = executableURL
-                task.arguments = arguments
-                processBox.set(task)
+                task.arguments = ["--ignore-config", "--ffmpeg-location", executableURL.deletingLastPathComponent().path] + arguments
                 defer { processBox.clear() }
 
                 let outputPipe = Pipe()
@@ -114,7 +111,7 @@ struct YTDLPClient {
                 task.standardOutput = outputPipe
                 task.standardError = errorPipe
 
-                try task.run()
+                try processBox.run(task)
 
                 async let output = Self.collectOutput(
                     from: outputPipe.fileHandleForReading,
@@ -135,6 +132,7 @@ struct YTDLPClient {
                 let (outputString, errorString) = try await (output, error)
 
                 try Task.checkCancellation()
+                if processBox.isCancelled { throw CancellationError() }
 
                 guard task.terminationStatus == 0 else {
                     let message = Self.nonProgressLines(in: errorString)
@@ -223,10 +221,15 @@ struct YTDLPClient {
 private final class YTDLPProcessBox: @unchecked Sendable {
     private let lock = NSLock()
     private var process: Process?
+    private var cancelled = false
 
-    func set(_ process: Process) {
-        lock.withLock {
+    var isCancelled: Bool { lock.withLock { cancelled } }
+
+    func run(_ process: Process) throws {
+        try lock.withLock {
+            if cancelled { throw CancellationError() }
             self.process = process
+            try process.run()
         }
     }
 
@@ -238,6 +241,7 @@ private final class YTDLPProcessBox: @unchecked Sendable {
 
     func terminate() {
         lock.withLock {
+            cancelled = true
             guard process?.isRunning == true else { return }
             process?.terminate()
         }

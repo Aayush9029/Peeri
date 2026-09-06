@@ -1,0 +1,13 @@
+Peeri bundles aria2 1.37.0, libssh2 1.11.1, and OpenSSL 3.6.4.
+
+aria2 is Copyright 2006–2019 Tatsuhiro Tsujikawa, licensed under GPL-2.0-or-later. Its bundled SFTP support links libssh2 and OpenSSL statically. HTTPS uses the macOS TLS implementation. The accompanying aria2, libssh2, and OpenSSL license files contain their notices and terms.
+
+The complete source archives and build instructions for the bundled engine are available in Peeri-1.1-engine-sources.tar.gz alongside the v1.1 release:
+https://github.com/Aayush9029/Peeri/releases/tag/v1.1
+
+https://github.com/aria2/aria2
+https://libssh2.org/
+https://openssl-library.org/
+
+Peeri also bundles FFmpeg and FFprobe 9.0.1, Copyright the FFmpeg developers, licensed under LGPL-2.1-or-later. These helpers merge downloaded streams without transcoding and are built without external libraries. The included FFmpeg license and the release source archive provide the terms and build instructions.
+https://ffmpeg.org/

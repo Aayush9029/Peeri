@@ -2,13 +2,14 @@ import Foundation
 import KeyboardShortcuts
 import Tagged
 
-public struct DownloadFile: Identifiable, Codable, Hashable {
+public struct DownloadFile: Identifiable, Codable, Hashable, Sendable {
     public typealias ID = Tagged<DownloadFile, UUID>
 
     public var id: ID
     public var gid: String
     public var url: URL
     public var fileName: String
+    public var destinationDirectory: String?
     public var filePath: String?
     public var fileSize: Int64?
     public var downloadedSize: Int64
@@ -18,6 +19,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     public var connections: Int?
     public var numSeeders: Int?
     public var uploadedSize: Int64?
+    public var videoTitle: String?
     public var thumbnailURL: URL?
     public var status: DownloadStatus
     /// Hex piece-availability map from aria2 (each bit = one piece downloaded)
@@ -32,6 +34,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         gid: String = "",
         url: URL,
         fileName: String,
+        destinationDirectory: String? = nil,
         filePath: String? = nil,
         fileSize: Int64? = nil,
         downloadedSize: Int64 = 0,
@@ -42,6 +45,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         numSeeders: Int? = nil,
         uploadedSize: Int64? = nil,
         thumbnailURL: URL? = nil,
+        videoTitle: String? = nil,
         status: DownloadStatus = .pending,
         bitfield: String? = nil,
         numPieces: Int? = nil,
@@ -51,6 +55,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.gid = gid
         self.url = url
         self.fileName = fileName
+        self.destinationDirectory = destinationDirectory
         self.filePath = filePath
         self.fileSize = fileSize
         self.downloadedSize = downloadedSize
@@ -60,11 +65,22 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
         self.connections = connections
         self.numSeeders = numSeeders
         self.uploadedSize = uploadedSize
+        self.videoTitle = videoTitle
         self.thumbnailURL = thumbnailURL
         self.status = status
         self.bitfield = bitfield
         self.numPieces = numPieces
         self.pieceLength = pieceLength
+    }
+
+    public var displayName: String {
+        if let videoTitle, !videoTitle.isEmpty { return videoTitle }
+        guard gid.hasPrefix("yt-dlp:"), VideoURLSupport.canHandle(url) else { return fileName }
+        let id = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "v" })?.value ?? url.lastPathComponent
+        let stem = (fileName as NSString).deletingPathExtension
+        let suffix = " [\(id)]"
+        return !id.isEmpty && stem.hasSuffix(suffix) ? String(stem.dropLast(suffix.count)) : fileName
     }
 
     public var progress: Double {
@@ -75,12 +91,18 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
             return 1
         }
         guard let fileSize = fileSize, fileSize > 0 else { return 0 }
-        return Double(downloadedSize) / Double(fileSize)
+        return min(1, max(0, Double(downloadedSize) / Double(fileSize)))
     }
 
     /// Whether this is a torrent (has seeders info)
     public var isTorrent: Bool {
-        numSeeders != nil
+        numSeeders != nil || url.scheme == "magnet"
+    }
+
+    public var torrentHash: String? {
+        guard url.scheme == "magnet" else { return nil }
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "xt" })?.value?.lowercased()
     }
 
     /// Whether aria2 has reported piece data for a piece-level grid
@@ -130,7 +152,7 @@ public struct DownloadFile: Identifiable, Codable, Hashable {
     }
 }
 
-public enum DownloadStatus: String, Codable {
+public enum DownloadStatus: String, Codable, Sendable {
     case pending
     case downloading
     case paused

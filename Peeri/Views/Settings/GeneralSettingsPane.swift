@@ -8,9 +8,17 @@ struct GeneralSettingsPane: View {
     @State private var folderError: String?
 
     var body: some View {
-        Form {
+        SettingsForm {
+            Section("Downloads") {
+                Toggle("Resume incomplete downloads", isOn: Binding($settings.continueDownloads))
+                Toggle("Verify downloaded files", isOn: Binding($settings.checkIntegrity))
+                Text("Resume partial web downloads and check files when a checksum is available.")
+                    .settingDescription()
+            }
             Section("Downloads Folder") {
-                LabeledContent("Location") {
+                HStack(spacing: 8) {
+                    Text("Location")
+                    Spacer(minLength: 12)
                     HStack(spacing: 8) {
                         Text(settings.downloadDirectory)
                             .lineLimit(1)
@@ -34,7 +42,7 @@ struct GeneralSettingsPane: View {
                     }
                 }
 
-                Text("Peeri uses this folder for aria2 and video downloads.")
+                Text("Save new downloads in this folder.")
                     .settingDescription()
 
                 if let folderError {
@@ -52,7 +60,7 @@ struct GeneralSettingsPane: View {
                     Text("Warning").tag("warn")
                     Text("Error").tag("error")
                 }
-                Text("Applies to the generated aria2 configuration and runtime options.")
+                Text("Controls how much detail appears in the download log.")
                     .settingDescription()
             }
 
@@ -62,7 +70,6 @@ struct GeneralSettingsPane: View {
                 }
             }
         }
-        .formStyle(.grouped)
         .alert("Restore Defaults?", isPresented: $showRestoreAlert) {
             Button("Restore", role: .destructive) {
                 $settings.withLock { $0 = .default }
@@ -95,9 +102,3 @@ struct GeneralSettingsPane: View {
         }
     }
 }
-
-#if DEBUG
-#Preview {
-    GeneralSettingsPane()
-}
-#endif

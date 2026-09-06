@@ -1,254 +1,146 @@
+import Models
+import Shared
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct AddDownloadView: View {
+    let goBack: () -> Void
     @Environment(DownloadManager.self) private var downloadManager
     @Environment(\.dismiss) private var dismiss
-
-    @State private var model = AddDownloadModel()
+    @Shared(.settings) private var settings
+    @Bindable var model: AddDownloadModel
     @FocusState private var isURLFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                linkInput
-                sourceActions
+            HStack(alignment: .center, spacing: 12) {
+                Button(action: goBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 26, height: 26)
+                        .background(.primary.opacity(0.05), in: .rect(cornerRadius: 7))
+                }
+                .buttonStyle(.plain)
+                .help("Back to commands")
+                .accessibilityLabel("Back to commands")
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $model.urlText)
+                        .font(.system(size: 18))
+                        .scrollContentBackground(.hidden)
+                        .focused($isURLFieldFocused)
+                        .accessibilityLabel("Download links")
+                        .onKeyPress(keys: [.return], phases: .down) { key in
+                            guard !key.modifiers.contains(.shift) else { return .ignored }
+                            activateSelection()
+                            return .handled
+                        }
+                    if model.isEmpty {
+                        Text("Paste a link or magnet…")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.tertiary)
+                            .padding(.leading, 5)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .frame(height: model.urlText.contains("\n") ? 76 : 26)
             }
-            .padding(22)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 22)
 
-            Divider()
+            VStack(alignment: .leading, spacing: 4) {
+                if model.hasValidInput {
+                    Button(action: addDownloads) {
+                        CommandPanelRow(
+                            title: DownloadLinks(model.urlText).summary,
+                            subtitle: model.validURLs.count > 1 ? "Downloads" : "Ready to download",
+                            symbol: "arrow.down.circle", selected: model.selection == .download
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.selection == .download ? .isSelected : [])
+                }
 
-            footer
+                Button(action: openTorrent) {
+                    CommandPanelRow(title: "Open Torrent File…", symbol: "doc", shortcut: "⌘O", selected: model.selection == .openTorrent)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut("o", modifiers: .command)
+                .accessibilityAddTraits(model.selection == .openTorrent ? .isSelected : [])
+
+                Button(action: chooseDirectory) {
+                    CommandPanelRow(
+                        title: "Save to",
+                        subtitle: ((model.destination?.path ?? settings.downloadDirectory) as NSString).abbreviatingWithTildeInPath,
+                        symbol: "folder", selected: model.selection == .chooseDirectory
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(model.selection == .chooseDirectory ? .isSelected : [])
+
+                Text(model.invalidURLCount > 0 ? "Enter a full download URL or magnet link." : "Paste multiple links on separate lines, or drop a torrent file.")
+                    .font(.caption)
+                    .foregroundStyle(model.invalidURLCount > 0 ? Color.red : Color.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
+
+            CommandPanelFooter {
+                CommandPanelAction(title: "Cancel", key: "esc") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                CommandPanelAction(title: actionTitle, key: "↵", action: activateSelection)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(model.selection == .download && !model.hasValidInput)
+                    .opacity(model.selection == .download && !model.hasValidInput ? 0.4 : 1)
+            }
         }
-        .frame(width: 500)
+        .onDrop(of: [.url, .fileURL, .text], isTargeted: $model.isDroppingFile, perform: handleDrop)
+        .overlay {
+            if model.isDroppingFile {
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(.regularMaterial)
+                    .overlay {
+                        Label("Drop to add", systemImage: "arrow.down.doc")
+                            .font(.title3)
+                    }
+                    .allowsHitTesting(false)
+            }
+        }
         .onAppear { isURLFieldFocused = true }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Add Download")
-                .font(.title3.weight(.semibold))
-
-            Text("HTTP, FTP, SFTP, magnet, and video links")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+        .onChange(of: model.hasValidInput) { _, valid in
+            model.selection = valid ? .download : .openTorrent
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .onKeyPress(.downArrow) { model.moveSelection(1); return .handled }
+        .onKeyPress(.upArrow) { model.moveSelection(-1); return .handled }
     }
 
-    private var linkInput: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("URL or Magnet Link")
-                    .font(.callout.weight(.semibold))
-                Spacer()
-                validityLabel
-            }
-
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $model.urlText)
-                    .font(.system(.body, design: .monospaced))
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .focused($isURLFieldFocused)
-                    .accessibilityLabel("URL or magnet link")
-
-                if model.isEmpty {
-                    placeholder
-                }
-
-                if model.isDroppingFile {
-                    dropOverlay
-                }
-            }
-            .frame(height: 136)
-            .background(inputBackground)
-            .overlay(inputBorder)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .onDrop(of: [.url, .fileURL, .text], isTargeted: $model.isDroppingFile) { handleDrop($0) }
-            .animation(.easeInOut(duration: 0.12), value: model.isDroppingFile)
-            .animation(.easeInOut(duration: 0.12), value: model.invalidURLCount)
+    private var actionTitle: String {
+        switch model.selection {
+        case .download: model.validURLs.count > 1 ? "Add \(model.validURLs.count) Downloads" : "Add Download"
+        case .openTorrent: "Open Torrent File"
+        case .chooseDirectory: "Choose Folder"
         }
     }
 
-    private var sourceActions: some View {
-        HStack(spacing: 10) {
-            sourceAction(
-                title: "Paste Link",
-                subtitle: model.clipboardPreview ?? "No supported link on clipboard",
-                systemImage: "doc.on.clipboard",
-                tint: .blue,
-                isEnabled: model.clipboardPreview != nil
-            ) {
-                model.pasteClipboard()
-                isURLFieldFocused = true
-            }
-
-            sourceAction(
-                title: "Open Torrent",
-                subtitle: "Choose a .torrent file",
-                systemImage: "doc.badge.plus",
-                tint: .orange
-            ) {
-                openTorrent()
-            }
+    private func activateSelection() {
+        switch model.selection {
+        case .download: if model.hasValidInput { addDownloads() }
+        case .openTorrent: openTorrent()
+        case .chooseDirectory: chooseDirectory()
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 12) {
-            footerMessage
-
-            Spacer(minLength: 12)
-
-            Button("Cancel") { dismiss() }
-                .keyboardShortcut(.cancelAction)
-
-            Button(addButtonTitle) { addDownloads() }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-                .disabled(!model.hasValidInput)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(.bar)
+    private func chooseDirectory() {
+        model.pickDirectory(startingAt: URL(fileURLWithPath: settings.downloadDirectory, isDirectory: true))
+        model.selection = model.hasValidInput ? .download : .openTorrent
+        isURLFieldFocused = true
     }
-
-    @ViewBuilder
-    private var validityLabel: some View {
-        if model.invalidURLCount > 0 {
-            Label("\(model.invalidURLCount) invalid", systemImage: "exclamationmark.circle.fill")
-                .foregroundStyle(.red)
-        } else if !model.validURLs.isEmpty {
-            Label(readyCountText, systemImage: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-        }
-    }
-
-    private var placeholder: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(verbatim: "https://example.com/file.zip")
-            Text(verbatim: "magnet:?xt=urn:btih:...")
-            Text(verbatim: "https://youtube.com/watch?v=...")
-                .foregroundStyle(.quaternary)
-            Text(verbatim: "one per line")
-                .foregroundStyle(.quaternary)
-        }
-        .font(.system(.body, design: .monospaced))
-        .foregroundStyle(.tertiary)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
-        .allowsHitTesting(false)
-    }
-
-    private var dropOverlay: some View {
-        ZStack {
-            Color.accentColor.opacity(0.12)
-
-            VStack(spacing: 8) {
-                Image(systemName: "arrow.down.doc.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                Text("Drop to add")
-                    .font(.callout.weight(.semibold))
-            }
-            .foregroundStyle(Color.accentColor)
-        }
-    }
-
-    private var inputBackground: some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(.quaternary.opacity(0.35))
-    }
-
-    private var inputBorder: some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .strokeBorder(inputBorderColor, lineWidth: model.isDroppingFile ? 2 : 1)
-    }
-
-    private var inputBorderColor: Color {
-        if model.isDroppingFile {
-            return .accentColor
-        } else if model.invalidURLCount > 0 {
-            return .red.opacity(0.65)
-        } else {
-            return .primary.opacity(0.12)
-        }
-    }
-
-    private var addButtonTitle: String {
-        model.validURLs.count > 1 ? "Add \(model.validURLs.count)" : "Add"
-    }
-
-    private var readyCountText: String {
-        model.validURLs.count == 1 ? "1 ready" : "\(model.validURLs.count) ready"
-    }
-
-    @ViewBuilder
-    private var footerMessage: some View {
-        if model.invalidURLCount > 0 {
-            Label("Fix invalid links before adding", systemImage: "exclamationmark.circle.fill")
-                .foregroundStyle(.red)
-        } else if !model.validURLs.isEmpty {
-            Label(
-                model.validURLs.count == 1 ? "1 download ready" : "\(model.validURLs.count) downloads ready",
-                systemImage: "checkmark.circle.fill"
-            )
-            .foregroundStyle(.secondary)
-        }
-    }
-
-    private func sourceAction(
-        title: String,
-        subtitle: String,
-        systemImage: String,
-        tint: Color,
-        isEnabled: Bool = true,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(tint)
-                    .frame(width: 32, height: 32)
-                    .background(tint.opacity(0.12), in: Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.callout.weight(.medium))
-                        .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.quaternary.opacity(0.28))
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.08))
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .opacity(isEnabled ? 1 : 0.55)
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-    }
-
-    // MARK: - Actions
 
     private func addDownloads() {
         for url in model.validURLs {
-            Task { await downloadManager.addDownload(url: url) }
+            Task { await downloadManager.addDownload(url: url, destination: model.destination) }
         }
         dismiss()
     }
@@ -256,7 +148,7 @@ struct AddDownloadView: View {
     private func openTorrent() {
         guard let fileURL = model.pickTorrentFile() else { return }
         Task {
-            await downloadManager.addTorrent(fileURL: fileURL)
+            await downloadManager.addTorrent(fileURL: fileURL, destination: model.destination)
             dismiss()
         }
     }
@@ -265,12 +157,12 @@ struct AddDownloadView: View {
         for provider in providers {
             if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
                 provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
-                    guard let data = item as? Data,
-                          let fileURL = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                    guard let value = Self.droppedText(item),
+                          let fileURL = URL(string: value) else { return }
                     DispatchQueue.main.async {
                         if fileURL.pathExtension.lowercased() == "torrent" {
                             Task {
-                                await downloadManager.addTorrent(fileURL: fileURL)
+                                await downloadManager.addTorrent(fileURL: fileURL, destination: model.destination)
                                 dismiss()
                             }
                         } else {
@@ -280,24 +172,23 @@ struct AddDownloadView: View {
                 }
             } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
                 provider.loadItem(forTypeIdentifier: UTType.url.identifier) { item, _ in
-                    guard let data = item as? Data,
-                          let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                    DispatchQueue.main.async { model.append(url.absoluteString) }
+                    guard let text = Self.droppedText(item) else { return }
+                    DispatchQueue.main.async { model.append(text) }
                 }
             } else if provider.hasItemConformingToTypeIdentifier(UTType.text.identifier) {
                 provider.loadItem(forTypeIdentifier: UTType.text.identifier) { item, _ in
-                    guard let data = item as? Data, let text = String(data: data, encoding: .utf8) else { return }
+                    guard let text = Self.droppedText(item) else { return }
                     DispatchQueue.main.async { model.append(text) }
                 }
             }
         }
         return true
     }
-}
 
-#if DEBUG
-#Preview {
-    AddDownloadView()
-        .environment(DownloadManager.preview())
+    nonisolated private static func droppedText(_ item: NSSecureCoding?) -> String? {
+        if let url = item as? URL { return url.absoluteString }
+        if let text = item as? String { return text }
+        if let data = item as? Data { return String(data: data, encoding: .utf8) }
+        return nil
+    }
 }
-#endif

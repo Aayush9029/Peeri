@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import CustomDump
 @testable import Aria2Kit
 
 @Suite("Aria2Kit Tests")
@@ -106,5 +107,31 @@ struct Aria2KitTests {
         let data = try JSONEncoder().encode(json)
         let decoded = try JSONSerialization.jsonObject(with: data) as? [String: String]
         #expect(decoded == ["key": "value"])
+    }
+
+    @Test("An active complete torrent is seeding; a stopped torrent is complete")
+    func seedingStatus() async throws {
+        let client = Aria2RPCClient()
+        for (status, expected) in [("active", DownloadStatus.seeding), ("complete", .completed), ("paused", .paused)] {
+            let json = """
+            {"gid":"123","status":"\(status)","totalLength":"100","completedLength":"100","downloadSpeed":"0","uploadSpeed":"20","seeder":"true","infoHash":"abc","dir":"/Downloads","bittorrent":{"info":{"name":"Ubuntu"},"mode":"multi"},"files":[{"index":"1","path":"/Downloads/Ubuntu/readme.txt","length":"100","completedLength":"100"}]}
+            """
+            let response = try JSONDecoder().decode(Aria2StatusResponse.self, from: Data(json.utf8))
+            let download = await client.processStatus(response)
+            expectNoDifference(download.status, expected)
+            expectNoDifference(download.fileName, "Ubuntu")
+            expectNoDifference(download.filePath, "/Downloads/Ubuntu")
+        }
+    }
+
+    @Test("Magnet metadata parents do not appear as duplicate downloads")
+    func metadataHandoff() async throws {
+        let json = """
+        [{"gid":"parent","status":"complete","totalLength":"100","completedLength":"100","downloadSpeed":"0","uploadSpeed":"0","followedBy":["child"]},{"gid":"child","status":"active","totalLength":"10000","completedLength":"100","downloadSpeed":"200","uploadSpeed":"0"}]
+        """
+        let responses = try JSONDecoder().decode([Aria2StatusResponse].self, from: Data(json.utf8))
+        let downloads = await Aria2RPCClient().processStatusList(responses)
+        expectNoDifference(downloads.count, 1)
+        expectNoDifference(downloads.first?.gid, "child")
     }
 }

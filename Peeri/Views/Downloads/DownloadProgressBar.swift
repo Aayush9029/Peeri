@@ -2,73 +2,44 @@ import Models
 import SwiftUI
 
 struct DownloadProgressBar: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let progress: Double
     let status: DownloadStatus
 
-    var body: some View {
-        GeometryReader { geo in
-            let clampedProgress = max(0, min(1, progress))
-            let fillWidth = clampedProgress * geo.size.width
+    private var tint: Color {
+        switch status {
+        case .completed, .seeding: .green
+        case .downloading: .blue
+        case .failed: .red
+        default: .gray
+        }
+    }
 
+    private var isActive: Bool { status == .downloading || status == .seeding }
+    private var clamped: Double { min(1, max(0, progress)) }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let fillWidth = clamped * geometry.size.width
             ZStack(alignment: .leading) {
                 Capsule().fill(.quaternary)
-                Capsule()
-                    .fill(fill)
+                TransferLight(tint: tint, animated: isActive)
                     .frame(width: fillWidth)
-                    .overlay {
-                        if status == .downloading, fillWidth > 0 {
-                            shimmer(width: fillWidth)
-                        }
-                    }
-                    .clipShape(Capsule())
-                    .animation(.spring(response: 0.35, dampingFraction: 0.82), value: clampedProgress)
+                    .clipShape(.capsule)
+                    .shadow(color: tint.opacity(isActive ? 0.5 : 0), radius: 3)
+                if isActive, clamped > 0.015, clamped < 0.995 {
+                    Capsule()
+                        .fill(.white)
+                        .frame(width: 2)
+                        .blur(radius: 1)
+                        .opacity(0.8)
+                        .offset(x: fillWidth - 2)
+                }
             }
+            .animation(reduceMotion ? nil : .smooth(duration: 0.3), value: progress)
         }
-        .frame(height: 8)
-    }
-
-    private var fill: AnyShapeStyle {
-        switch status {
-        case .completed, .seeding:
-            AnyShapeStyle(LinearGradient(colors: [.green.opacity(0.8), .green], startPoint: .leading, endPoint: .trailing))
-        case .downloading:
-            AnyShapeStyle(LinearGradient(colors: [.blue.opacity(0.7), .blue], startPoint: .leading, endPoint: .trailing))
-        default:
-            AnyShapeStyle(Color.gray.opacity(0.5))
-        }
-    }
-
-    private func shimmer(width: CGFloat) -> some View {
-        TimelineView(.animation) { context in
-            let duration = 1.15
-            let phase = context.date.timeIntervalSinceReferenceDate
-                .truncatingRemainder(dividingBy: duration) / duration
-            let shimmerWidth = max(28, width * 0.45)
-            let travel = width + shimmerWidth * 2
-
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, .white.opacity(0.42), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(width: shimmerWidth)
-                .offset(x: -shimmerWidth + travel * phase)
-        }
-        .frame(width: width, alignment: .leading)
+        .frame(height: 6)
+        .accessibilityLabel("Progress")
+        .accessibilityValue(Text(progress, format: .percent.precision(.fractionLength(0))))
     }
 }
-
-#if DEBUG
-#Preview {
-    VStack(spacing: 16) {
-        DownloadProgressBar(progress: 0.6, status: .downloading)
-        DownloadProgressBar(progress: 1, status: .completed)
-        DownloadProgressBar(progress: 0.3, status: .paused)
-    }
-    .frame(width: 220)
-    .padding()
-}
-#endif

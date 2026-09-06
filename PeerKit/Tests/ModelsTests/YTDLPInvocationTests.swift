@@ -34,7 +34,7 @@ struct YTDLPInvocationTests {
             "--windows-filenames",
             "--paths", "/Users/example/Downloads",
             "--output", "%(title).200B [%(id)s].%(ext)s",
-            "--format", "best[ext=mp4]/best",
+            "--format", "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b",
             "--print", "after_move:filepath",
             "https://www.youtube.com/watch?v=z9eIgg0ArDg"
         ])
@@ -42,8 +42,8 @@ struct YTDLPInvocationTests {
 
     @Test("Maps format preferences")
     func formatPreferenceMapping() {
-        #expect(VideoFormatPreference.best.ytdlpFormat == "b")
-        #expect(VideoFormatPreference.mp4.ytdlpFormat == "best[ext=mp4]/best")
+        #expect(VideoFormatPreference.best.ytdlpFormat == "bv*+ba/b")
+        #expect(VideoFormatPreference.mp4.ytdlpFormat == "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b")
         #expect(VideoFormatPreference.audioOnly.ytdlpFormat == "bestaudio[ext=m4a]/bestaudio/best")
     }
 }

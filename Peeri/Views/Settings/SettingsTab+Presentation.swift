@@ -6,6 +6,8 @@ extension SettingsTab {
         case .general: "General"
         case .downloads: "Downloads"
         case .bitTorrent: "BitTorrent"
+        case .trackers: "Trackers"
+        case .network: "Network"
         case .video: "Video"
         }
     }
@@ -15,6 +17,8 @@ extension SettingsTab {
         case .general: "gearshape"
         case .downloads: "arrow.down.circle"
         case .bitTorrent: "network"
+        case .trackers: "point.3.connected.trianglepath.dotted"
+        case .network: "globe"
         case .video: "play.rectangle"
         }
     }
@@ -24,6 +28,8 @@ extension SettingsTab {
         case .general: .indigo
         case .downloads: .blue
         case .bitTorrent: .green
+        case .trackers: .purple
+        case .network: .cyan
         case .video: .orange
         }
     }

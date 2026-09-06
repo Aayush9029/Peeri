@@ -16,14 +16,3 @@ struct SettingsTabIcon: View {
         .frame(width: size, height: size)
     }
 }
-
-#if DEBUG
-#Preview {
-    VStack(alignment: .leading) {
-        ForEach(SettingsTab.allCases, id: \.self) { tab in
-            HStack { SettingsTabIcon(tab: tab); Text(tab.title) }
-        }
-    }
-    .padding()
-}
-#endif

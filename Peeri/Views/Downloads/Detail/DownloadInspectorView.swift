@@ -3,38 +3,52 @@ import Models
 import Shared
 import SwiftUI
 
-struct DownloadDetailPopoverView: View {
+struct DownloadInspectorView: View {
     let downloadID: DownloadFile.ID
 
     @Environment(DownloadManager.self) private var downloadManager
 
-    @State private var peers: IdentifiedArrayOf<PeerDisplay> = []
+    @State private var peerNetwork = PeerNetworkModel()
 
     private var download: DownloadFile? { downloadManager.downloads[id: downloadID] }
 
     var body: some View {
         Group {
             if let download {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        summary(download)
-                        metricStrip(download)
-                        sourceSection(download)
-
-                        if download.isTorrent {
-                            piecesSection(download)
-                            peersSection
+                GeometryReader { geometry in
+                    ScrollView {
+                        if download.isVideoDownload {
+                            VideoDownloadInspectorView(download: download, artworkHeight: max(220, min(360, geometry.size.height * 0.48)))
+                        } else {
+                            VStack(alignment: .leading, spacing: 22) {
+                                summary(download)
+                                metricStrip(download)
+                                if !peerNetwork.peers.isEmpty { peersSection }
+                                if download.isTorrent && download.hasPieceData {
+                                    piecesSection(download)
+                                }
+                                sourceSection(download)
+                            }
+                            .padding(20)
                         }
                     }
-                    .padding(16)
                 }
             } else {
                 ContentUnavailableView("Download Unavailable", systemImage: "questionmark.folder")
-                    .frame(width: 380, height: 240)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .frame(width: download?.isTorrent == true ? 440 : 380, height: download?.isTorrent == true ? 460 : 300)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(alignment: .top) {
+            if let download, !download.isVideoDownload {
+                TransferAtmosphere(tint: download.status.tint, animated: [.downloading, .seeding].contains(download.status))
+                    .frame(height: 240)
+                    .clipShape(.rect(cornerRadius: 14))
+                    .padding(.horizontal, 12)
+            }
+        }
         .task(id: downloadID) {
+            peerNetwork.update([])
             guard download?.isTorrent == true else { return }
             while !Task.isCancelled {
                 await refreshTorrentDetail()
@@ -44,18 +58,23 @@ struct DownloadDetailPopoverView: View {
     }
 
     private func refreshTorrentDetail() async {
-        guard let download, download.isTorrent else { return }
-        peers = .from(await downloadManager.peers(for: download.gid), numPieces: download.numPieces ?? 0)
+        guard let download, download.isTorrent, [.downloading, .seeding].contains(download.status) else { peerNetwork.update([]); return }
+        let peers = await downloadManager.peers(for: download.gid)
+        guard !Task.isCancelled else { return }
+        peerNetwork.update(.from(peers, numPieces: download.numPieces ?? 0))
+        let locations = await PeerCountryLookup.shared.locations(for: peers.map(\.ip))
+        guard !Task.isCancelled else { return }
+        peerNetwork.updateLocations(locations)
     }
 
     private func summary(_ download: DownloadFile) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                DownloadArtworkView(download: download, size: 58)
+            HStack(alignment: .center, spacing: 16) {
+                TransferOrbit(download: download)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(download.fileName)
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .semibold))
                         .lineLimit(2)
                         .truncationMode(.middle)
 
@@ -68,19 +87,19 @@ struct DownloadDetailPopoverView: View {
                 Spacer(minLength: 0)
             }
 
-            ProgressView(value: download.progress)
-                .tint(download.status.tint)
         }
     }
 
     private func metricStrip(_ download: DownloadFile) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             metric("Progress", download.progressPercentage)
             metric("Size", download.displaySize)
 
             if download.isTorrent {
-                metric("Peers", download.connections.map(String.init) ?? "0")
-                if let numPieces = download.numPieces {
+                if let connections = download.connections, connections > 0 {
+                    metric("Peers", String(connections))
+                }
+                if let numPieces = download.numPieces, numPieces > 0 {
                     metric("Pieces", "\(numPieces)")
                 }
             }
@@ -89,49 +108,44 @@ struct DownloadDetailPopoverView: View {
 
     private func metric(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label.uppercased())
-                .font(.caption2.weight(.semibold))
+            Text(label)
+                .font(.caption2)
                 .foregroundStyle(.tertiary)
             Text(value)
-                .font(.callout.monospacedDigit())
+                .font(.system(size: 17, weight: .medium, design: .rounded).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(.quaternary, in: .rect(cornerRadius: 8))
+        .padding(.vertical, 12)
     }
 
     private func sourceSection(_ download: DownloadFile) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("SOURCE")
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(download.url.absoluteString)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                if let filePath = download.filePath {
-                    Text(filePath)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+        HStack {
+            Button { downloadManager.copyURL(download) } label: {
+                Label("Copy Link", systemImage: "link")
+            }
+            Spacer()
+            if downloadManager.resolvedFileURL(for: download) != nil {
+                Button { downloadManager.showInFinder(download) } label: {
+                    Label("Show in Finder", systemImage: "folder")
                 }
             }
         }
+        .buttonStyle(.borderless)
+        .font(.caption)
+        .foregroundStyle(.secondary)
     }
 
     private func piecesSection(_ download: DownloadFile) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("PIECES")
+            sectionHeader("Pieces")
             if download.hasPieceData {
                 PieceGridView(
                     bitfield: download.bitfield,
                     numPieces: download.numPieces ?? 0,
-                    isComplete: download.status == .completed || download.status == .seeding
+                    isComplete: download.status == .completed || download.status == .seeding,
+                    tint: download.status.tint
                 )
             } else {
                 Text("Waiting for torrent metadata")
@@ -144,15 +158,19 @@ struct DownloadDetailPopoverView: View {
 
     private var peersSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeader("PEERS", count: peers.count)
-            if peers.isEmpty {
-                emptyHint("No peers connected yet")
-            } else {
-                LazyVStack(spacing: 4) {
-                    ForEach(peers) { peer in
-                        PeerRow(peer: peer)
+            sectionHeader("Peers", count: peerNetwork.peers.count)
+            PeerNetworkView(model: peerNetwork)
+            peerList
+        }
+    }
+
+    private var peerList: some View {
+        LazyVStack(spacing: 6) {
+            ForEach(peerNetwork.peers) { peer in
+                PeerRow(peer: peer, location: peerNetwork.locations[peer.ip] ?? .unavailable)
+                    .onHover { hovering in
+                        peerNetwork.highlightedPeerID = hovering ? peer.id : nil
                     }
-                }
             }
         }
     }
@@ -168,13 +186,6 @@ struct DownloadDetailPopoverView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-    }
-
-    private func emptyHint(_ message: String) -> some View {
-        Text(message)
-            .font(.callout)
-            .foregroundStyle(.tertiary)
-            .frame(maxWidth: .infinity, minHeight: 48)
     }
 
     private func statusText(_ download: DownloadFile) -> String {
@@ -196,15 +207,3 @@ struct DownloadDetailPopoverView: View {
         }
     }
 }
-
-#if DEBUG
-#Preview("Video") {
-    DownloadDetailPopoverView(downloadID: DownloadFile.sampleDownloading.id)
-        .environment(DownloadManager.preview())
-}
-
-#Preview("Torrent") {
-    DownloadDetailPopoverView(downloadID: DownloadFile.sampleTorrent.id)
-        .environment(DownloadManager.preview())
-}
-#endif

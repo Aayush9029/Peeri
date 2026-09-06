@@ -15,7 +15,7 @@ struct TransferChart: View {
                 x: .value("Time", index),
                 y: .value("Rate", value)
             )
-            .interpolationMethod(.catmullRom)
+            .interpolationMethod(.monotone)
             .foregroundStyle(
                 LinearGradient(
                     colors: [tint.opacity(0.35), tint.opacity(0.02)],
@@ -28,24 +28,13 @@ struct TransferChart: View {
                 x: .value("Time", index),
                 y: .value("Rate", value)
             )
-            .interpolationMethod(.catmullRom)
+            .interpolationMethod(.monotone)
             .foregroundStyle(tint)
             .lineStyle(.init(lineWidth: 2))
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartYScale(domain: 0...maxValue)
-        .animation(.smooth(duration: 0.6), value: samples)
+        .accessibilityLabel("Transfer speed over the last 60 seconds")
     }
 }
-
-#if DEBUG
-#Preview {
-    TransferChart(
-        samples: (0..<60).map { 1_000_000 * (1 + sin(Double($0) / 6)) },
-        tint: .blue
-    )
-    .frame(width: 320, height: 80)
-    .padding()
-}
-#endif

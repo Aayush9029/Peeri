@@ -1,0 +1,10 @@
+.DS_Store
+.local/
+.build/
+build/
+build-release/
+DerivedData/
+*.xcarchive
+*.dmg
+*.xcuserstate
+xcuserdata/

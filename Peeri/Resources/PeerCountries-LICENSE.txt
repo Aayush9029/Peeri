@@ -1,0 +1,14 @@
+IP Geolocation by DB-IP
+https://db-ip.com/
+
+DB-IP Country Lite, 2026-09
+https://download.db-ip.com/free/dbip-country-lite-2026-09.csv.gz
+
+Licensed under Creative Commons Attribution 4.0 International.
+https://creativecommons.org/licenses/by/4.0/
+
+Modified for Peeri: CSV ranges converted to a compact binary format.
+Location estimates have reduced coverage and accuracy and may be outdated.
+
+Source archive SHA-256: a32bb3c384bd3de60ad9024596aa5b395a6dd5beaa27a7223407cc2edc681d0b
+Binary SHA-256: bf33e8b21b69e64d1665976d45be9aeb66282a6a7fe506b3b41d943d971a5202

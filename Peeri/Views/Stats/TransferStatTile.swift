@@ -31,33 +31,9 @@ struct TransferStatTile: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 12))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(tint.opacity(0.15)) }
         .saturation(dimmed ? 0 : 1)
         .opacity(dimmed ? 0.6 : 1)
     }
 }
-
-#if DEBUG
-#Preview {
-    HStack(spacing: 12) {
-        TransferStatTile(
-            title: "Download",
-            systemImage: "arrow.down",
-            tint: .blue,
-            rate: 15_728_640,
-            total: 3_220_000_000,
-            history: (0..<60).map { 12_000_000 * (1 + sin(Double($0) / 6)) }
-        )
-        TransferStatTile(
-            title: "Upload",
-            systemImage: "arrow.up",
-            tint: .green,
-            rate: 2_097_152,
-            total: 1_073_741_824,
-            history: (0..<60).map { 1_500_000 * (1 + cos(Double($0) / 5)) }
-        )
-    }
-    .frame(width: 640)
-    .padding()
-}
-#endif

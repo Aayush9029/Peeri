@@ -21,6 +21,7 @@ extension Target.Dependency {
     static let identifiedCollections: Self = .product(name: "IdentifiedCollections", package: "swift-identified-collections")
     static let swiftTagged: Self = .product(name: "Tagged", package: "swift-tagged")
     static let keyboardShortcuts: Self = .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts")
+    static let universalGlass: Self = .product(name: "UniversalGlass", package: "UniversalGlass")
 }
 
 let package = Package(
@@ -36,11 +37,12 @@ let package = Package(
         .library(name: "Aria2Kit", targets: ["Aria2Kit"])
     ],
     dependencies: [
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.14.1"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.17.1"),
         .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.1.1"),
         .package(url: "https://github.com/rurza/KeyboardShortcuts.git", branch: "main"),
-        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.9.0"),
+        .package(url: "https://github.com/pointfreeco/swift-sharing", from: "2.10.1"),
         .package(url: "https://github.com/pointfreeco/swift-tagged.git", from: "0.10.0"),
+        .package(url: "https://github.com/Aeastr/UniversalGlass.git", from: "1.1.0"),
     ],
     targets: [
         .target(
@@ -48,7 +50,8 @@ let package = Package(
             dependencies: [
                 .models,
                 .keyboardShortcuts,
-                .assets
+                .assets,
+                .universalGlass
             ]
         ),
         .target(

@@ -2,103 +2,47 @@ import SwiftUI
 
 struct PeerRow: View {
     let peer: PeerDisplay
+    var location: PeerLocation = .unavailable
 
     var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(peer.isSeeder ? Color.green : Color.blue)
-                .frame(width: 7, height: 7)
-                .help(peer.isSeeder ? "Seeder" : "Leecher")
-
-            Text(peer.ip)
-                .font(.callout.monospaced())
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(minWidth: 92, alignment: .leading)
-
-            MiniProgressBar(progress: peer.progress, tint: peer.isSeeder ? .green : .blue)
-                .frame(width: 52)
-
-            Text(percentText)
+        VStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let name = location.name {
+                        Text([location.flag, name].compactMap { $0 }.joined(separator: " "))
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                            .help("Approximate location from the bundled DB-IP Country Lite database. Country lookup happens on your Mac.")
+                    }
+                    Text(peer.ip)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Label(peer.formattedDownloadSpeed, systemImage: "arrow.down")
+                    Label(peer.formattedUploadSpeed, systemImage: "arrow.up")
+                }
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .frame(width: 40, alignment: .trailing)
-
-            Spacer(minLength: 8)
-
-            chokeBadges
-
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.down")
-                Text(peer.formattedDownloadSpeed)
             }
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(peer.downloadSpeed > 0 ? .primary : .secondary)
-            .frame(width: 74, alignment: .trailing)
-
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.up")
-                Text(peer.formattedUploadSpeed)
+            HStack {
+                Text(peer.isSeeder ? "Seeder" : "Peer")
+                Spacer()
+                Text(peer.progress, format: .percent.precision(.fractionLength(0)))
+                    .monospacedDigit()
+                    .accessibilityLabel("Peer progress")
             }
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(peer.uploadSpeed > 0 ? .primary : .secondary)
-            .frame(width: 74, alignment: .trailing)
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.gray.opacity(0.06))
-        )
-    }
-
-    private var percentText: String {
-        "\(Int((peer.progress * 100).rounded()))%"
-    }
-
-    private var chokeBadges: some View {
-        HStack(spacing: 4) {
-            if !peer.peerChoking {
-                badge("Unchoked by peer", color: .green)
-            }
-            if !peer.amChoking {
-                badge("Unchoking peer", color: .blue)
-            }
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(.quaternary)
+                .frame(height: 0.5)
         }
     }
-
-    private func badge(_ tooltip: String, color: Color) -> some View {
-        Circle()
-            .fill(color.opacity(0.7))
-            .frame(width: 5, height: 5)
-            .help(tooltip)
-    }
 }
-
-private struct MiniProgressBar: View {
-    let progress: Double
-    let tint: Color
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(.quaternary)
-                Capsule()
-                    .fill(tint)
-                    .frame(width: max(0, geo.size.width * progress))
-            }
-        }
-        .frame(height: 5)
-    }
-}
-
-#if DEBUG
-#Preview {
-    VStack(spacing: 6) {
-        PeerRow(peer: .preview(ip: "192.168.1.42", seeder: true, progress: 1.0))
-        PeerRow(peer: .preview(ip: "2607:f8b0:4005:80a::200e", seeder: false, progress: 0.34))
-    }
-    .padding()
-    .frame(width: 560)
-}
-#endif

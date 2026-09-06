@@ -1,57 +1,48 @@
 import AppKit
+import Models
 import SwiftUI
 import UniformTypeIdentifiers
 
 @MainActor
 @Observable
 final class AddDownloadModel {
-    var urlText = ""
+    var urlText: String
     var isDroppingFile = false
+    var destination: URL?
+    var selection = Action.download
 
-    var validURLs: [URL] {
-        lines.compactMap { Self.downloadURL(from: $0) }
+    enum Action { case download, openTorrent, chooseDirectory }
+
+    var availableActions: [Action] {
+        hasValidInput ? [.download, .openTorrent, .chooseDirectory] : [.openTorrent, .chooseDirectory]
     }
 
-    var invalidURLCount: Int {
-        lines.count - validURLs.count
+    func moveSelection(_ offset: Int) {
+        guard let index = availableActions.firstIndex(of: selection) else {
+            selection = offset > 0 ? availableActions[0] : availableActions[availableActions.count - 1]
+            return
+        }
+        selection = availableActions[(index + offset + availableActions.count) % availableActions.count]
     }
 
-    var hasValidInput: Bool {
-        !validURLs.isEmpty && invalidURLCount == 0
+    func pickDirectory(startingAt directory: URL) {
+        let panel = NSOpenPanel()
+        panel.title = "Download Folder"
+        panel.prompt = "Choose Folder"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = destination ?? directory
+        if panel.runModal() == .OK { destination = panel.url }
     }
 
-    var isEmpty: Bool {
-        urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+    init(text: String = "") { urlText = text }
 
-    private var lines: [String] {
-        urlText
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-    }
-
-    private static let supportedURLSchemes: Set<String> = [
-        "http",
-        "https",
-        "ftp",
-        "sftp",
-        "magnet"
-    ]
-
-    var clipboardPreview: String? {
-        guard let content = NSPasteboard.general.string(forType: .string)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-            !content.isEmpty,
-            Self.downloadURL(from: content) != nil
-        else { return nil }
-        return String(content.prefix(60)) + (content.count > 60 ? "..." : "")
-    }
-
-    func pasteClipboard() {
-        guard let content = NSPasteboard.general.string(forType: .string) else { return }
-        urlText = content.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    var validURLs: [URL] { DownloadLinks(urlText).urls }
+    var invalidURLCount: Int { DownloadLinks(urlText).invalidCount }
+    var hasValidInput: Bool { DownloadLinks(urlText).isValid }
+    var isEmpty: Bool { urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     func append(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,11 +57,4 @@ final class AddDownloadModel {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    private static func downloadURL(from line: String) -> URL? {
-        guard let url = URL(string: line),
-              let scheme = url.scheme?.lowercased(),
-              supportedURLSchemes.contains(scheme)
-        else { return nil }
-        return url
-    }
 }

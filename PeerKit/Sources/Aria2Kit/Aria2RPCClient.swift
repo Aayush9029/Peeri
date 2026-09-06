@@ -244,13 +244,15 @@ actor Aria2RPCClient {
 
         // Extract URI
         var uri: URL
-        if let files = status.files, let firstFile = files.first,
-           let uris = firstFile.uris, let firstUri = uris.first,
-           let validUri = URL(string: firstUri.uri) {
+        if let infoHash = status.infoHash {
+            var components = URLComponents()
+            components.scheme = "magnet"
+            components.queryItems = [URLQueryItem(name: "xt", value: "urn:btih:" + infoHash)]
+                + (status.bittorrent?.announceList ?? []).flatMap { $0 }.map { URLQueryItem(name: "tr", value: $0) }
+            uri = components.url!
+        } else if let firstUri = status.files?.first?.uris?.first,
+                  let validUri = URL(string: firstUri.uri) {
             uri = validUri
-        } else if let infoHash = status.infoHash,
-                  let magnetUri = URL(string: "magnet:?xt=urn:btih:" + infoHash) {
-            uri = magnetUri
         } else {
             uri = URL(string: "file://localhost/unknown")!
         }
@@ -272,6 +274,13 @@ actor Aria2RPCClient {
             fileName = uri.lastPathComponent
         }
 
+        if let torrentName = status.bittorrent?.info?.name, !torrentName.isEmpty {
+            fileName = torrentName
+            if let directory = status.dir {
+                filePath = URL(fileURLWithPath: directory).appendingPathComponent(torrentName).path
+            }
+        }
+
         let totalLength = Int64(status.totalLength) ?? 0
         let completedLength = Int64(status.completedLength) ?? 0
         let downloadSpeed = Int64(status.downloadSpeed)
@@ -279,15 +288,10 @@ actor Aria2RPCClient {
 
         let downloadStatus: DownloadStatus
         switch status.status {
-        case "active": downloadStatus = .downloading
+        case "active": downloadStatus = status.seeder == "true" ? .seeding : .downloading
         case "waiting": downloadStatus = .pending
         case "paused": downloadStatus = .paused
-        case "complete":
-            if status.bittorrent != nil && status.seeder == "true" {
-                downloadStatus = .seeding
-            } else {
-                downloadStatus = .completed
-            }
+        case "complete": downloadStatus = .completed
         case "removed": downloadStatus = .removed
         case "error": downloadStatus = .failed
         default: downloadStatus = .pending
@@ -304,6 +308,7 @@ actor Aria2RPCClient {
             gid: gid,
             url: uri,
             fileName: fileName,
+            destinationDirectory: status.dir,
             filePath: filePath,
             fileSize: totalLength > 0 ? totalLength : nil,
             downloadedSize: completedLength,
@@ -320,6 +325,6 @@ actor Aria2RPCClient {
     }
 
     func processStatusList(_ statuses: [Aria2StatusResponse]) -> [DownloadFile] {
-        return statuses.map { processStatus($0) }
+        statuses.filter { $0.followedBy?.isEmpty != false }.map { processStatus($0) }
     }
 }

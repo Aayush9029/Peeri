@@ -1,3 +1,5 @@
+import AppKit
+import UniformTypeIdentifiers
 import Models
 import SwiftUI
 
@@ -61,19 +63,10 @@ struct DownloadArtworkView: View {
     }
 
     private var fallbackIcon: some View {
-        Image(systemName: download.status.symbol)
-            .font(.system(size: size * 0.44, weight: .semibold))
-            .foregroundStyle(download.status.tint)
+        Image(nsImage: NSWorkspace.shared.icon(for: UTType(filenameExtension: (download.fileName as NSString).pathExtension) ?? .data))
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
     }
-}
 
-#if DEBUG
-#Preview {
-    HStack(spacing: 12) {
-        DownloadArtworkView(download: .sampleDownloading)
-        DownloadArtworkView(download: .sampleCompleted)
-        DownloadArtworkView(download: .sampleFailed)
-    }
-    .padding()
 }
-#endif

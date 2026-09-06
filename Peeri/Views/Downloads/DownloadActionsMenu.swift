@@ -28,7 +28,10 @@ struct DownloadActionsMenu: View {
         case .paused:
             Button { Task { await downloadManager.resumeDownload(download) } } label: { Label("Resume", systemImage: "play.fill") }
             cancelItem
-        case .completed, .seeding:
+        case .seeding:
+            Button { Task { await downloadManager.pauseDownload(download) } } label: { Label("Pause Seeding", systemImage: "pause.fill") }
+            removeItem()
+        case .completed:
             removeItem()
         case .failed:
             Button { Task { await downloadManager.retryDownload(download) } } label: { Label("Retry", systemImage: "arrow.clockwise") }
@@ -45,7 +48,7 @@ struct DownloadActionsMenu: View {
     }
 
     private func removeItem() -> some View {
-        Button(role: .destructive) { downloadManager.removeDownload(download) } label: { Label("Remove Download", systemImage: "trash") }
+        Button(role: .destructive) { Task { await downloadManager.removeDownload(download) } } label: { Label("Remove Download", systemImage: "trash") }
     }
 
     private var hasLocalFile: Bool {

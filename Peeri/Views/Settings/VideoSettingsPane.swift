@@ -7,9 +7,9 @@ struct VideoSettingsPane: View {
     @State private var versionStatus: VersionStatus = .checking
 
     var body: some View {
-        Form {
-            Section("yt-dlp") {
-                LabeledContent("Status") {
+        SettingsForm {
+            Section("Video Downloads") {
+                LabeledContent("Downloader version") {
                     versionLabel
                 }
 
@@ -17,7 +17,7 @@ struct VideoSettingsPane: View {
                     Task { await refreshVersion() }
                 }
 
-                Text("Peeri uses the bundled yt-dlp executable for YouTube and other supported video links.")
+                Text("Download videos from YouTube and Vimeo.")
                     .settingDescription()
             }
 
@@ -31,7 +31,6 @@ struct VideoSettingsPane: View {
                     .settingDescription()
             }
         }
-        .formStyle(.grouped)
         .task {
             await refreshVersion()
         }
@@ -71,7 +70,7 @@ private enum VersionStatus: Equatable {
 private extension VideoFormatPreference {
     var title: String {
         switch self {
-        case .best: "Best single file"
+        case .best: "Best quality"
         case .mp4: "Prefer MP4"
         case .audioOnly: "Audio only"
         }
@@ -80,17 +79,11 @@ private extension VideoFormatPreference {
     var description: String {
         switch self {
         case .best:
-            "Downloads the best single-file format yt-dlp can find without requiring a separate merge step."
+            "Download the best available video and audio, combined into one file."
         case .mp4:
-            "Prefers MP4 when available, then falls back to the best single-file format."
+            "Choose MP4 when available, or the next best format."
         case .audioOnly:
             "Downloads the best available audio stream."
         }
     }
 }
-
-#if DEBUG
-#Preview {
-    VideoSettingsPane()
-}
-#endif

@@ -6,35 +6,43 @@ struct DownloadTable: View {
     @Environment(DownloadManager.self) private var downloadManager
 
     let downloads: [DownloadFile]
+    var emptyTitle = "No downloads yet"
+    var emptyDescription = "Add a download to get started."
 
     @Binding var selection: Set<DownloadFile.ID>
-    @Binding var detailDownload: DownloadFile?
+    let showDetail: (DownloadFile) -> Void
 
-    private var hasTorrents: Bool {
-        downloads.contains(where: \.isTorrent)
-    }
+    @State private var sortOrder = [KeyPathComparator(\DownloadFile.displayName)]
+
+    private var sortedDownloads: [DownloadFile] { downloads.sorted(using: sortOrder) }
 
     var body: some View {
-        Table(downloads, selection: $selection) {
-            TableColumn("Name") { download in
+        Table(sortedDownloads, selection: $selection, sortOrder: $sortOrder) {
+            TableColumn("Name", value: \.displayName) { download in
                 HStack(spacing: 9) {
                     DownloadArtworkView(download: download)
-                    Text(download.fileName)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(download.displayName)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(download.status.rawValue.capitalized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
                 }
-                .popover(isPresented: detailPresentation(for: download), arrowEdge: .trailing) {
-                    DownloadDetailPopoverView(downloadID: download.id)
-                        .environment(downloadManager)
-                }
+
             }
             .width(min: 220, ideal: 320)
 
-            TableColumn("Progress") { download in
-                DownloadProgressBar(
-                    progress: download.progress,
-                    status: download.status
-                )
+            TableColumn("Progress", value: \.progress) { download in
+                VStack(alignment: .leading, spacing: 5) {
+                    DownloadProgressBar(progress: download.progress, status: download.status)
+                    Text(download.progressPercentage)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
             .width(min: 132, ideal: 190)
 
@@ -52,24 +60,14 @@ struct DownloadTable: View {
                 Text(download.displaySpeed).monospacedDigit().foregroundStyle(.secondary)
             }
             .width(min: 80, ideal: 100)
-
-            if hasTorrents {
-                TableColumn("Seeds") { download in
-                    Text(download.numSeeders.map(String.init) ?? "—").monospacedDigit().foregroundStyle(.secondary)
-                }
-                .width(min: 50, ideal: 64)
-
-                TableColumn("Peers") { download in
-                    Text(download.connections.map(String.init) ?? "—").monospacedDigit().foregroundStyle(.secondary)
-                }
-                .width(min: 50, ideal: 64)
-            }
         }
         .tableStyle(.inset)
+        .scrollContentBackground(.hidden)
+        .alternatingRowBackgrounds(.disabled)
         .contextMenu(forSelectionType: DownloadFile.ID.self) { ids in
             if let download = download(for: ids) {
                 DownloadActionsMenu(download: download) {
-                    detailDownload = download
+                    showDetail(download)
                 }
             }
         } primaryAction: { ids in
@@ -80,9 +78,9 @@ struct DownloadTable: View {
         .overlay {
             if downloads.isEmpty {
                 ContentUnavailableView(
-                    "No downloads yet",
+                    emptyTitle,
                     systemImage: "arrow.down.circle",
-                    description: Text("Add a download to get started")
+                    description: Text(emptyDescription)
                 )
             }
         }
@@ -93,36 +91,5 @@ struct DownloadTable: View {
         return downloads.first { $0.id == id }
     }
 
-    private func detailPresentation(for download: DownloadFile) -> Binding<Bool> {
-        Binding(
-            get: { detailDownload?.id == download.id },
-            set: { isPresented in
-                if !isPresented, detailDownload?.id == download.id {
-                    detailDownload = nil
-                }
-            }
-        )
-    }
-}
 
-#if DEBUG
-#Preview("Populated") {
-    DownloadTable(
-        downloads: .sampleList,
-        selection: .constant([]),
-        detailDownload: .constant(nil)
-    )
-        .environment(DownloadManager.preview())
-        .frame(width: 860, height: 420)
 }
-
-#Preview("Empty") {
-    DownloadTable(
-        downloads: [],
-        selection: .constant([]),
-        detailDownload: .constant(nil)
-    )
-        .environment(DownloadManager.preview(downloads: []))
-        .frame(width: 860, height: 420)
-}
-#endif
