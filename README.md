@@ -1,3 +1,11 @@
+> [!WARNING]
+> APPLE REMOVED MY APPLE ID FOR MAKING MAC APPS that they didn't agree with. Please wait a moment while I figure out new signing keys. Until then, macOS reports the downloaded app as damaged. Move the app to Applications, then run:
+>
+> ```bash
+> xattr -c /Applications/Peeri.app
+> open /Applications/Peeri.app
+> ```
+
 <p align="center">
   <img src="assets/readme/icon.png" width="96" alt="Peeri icon">
 </p>
